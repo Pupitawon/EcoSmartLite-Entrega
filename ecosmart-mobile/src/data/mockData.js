@@ -181,29 +181,13 @@ export function getFillStatus(fill) {
 // (contenedor dañado o con residuos que no corresponden a su tipo)
 // ---------------------------------------------------------------------
 
+// Mismos ids que acepta POST /api/reportes (ecosmart-backend/src/services/reporteService.js).
+// El envío real está en services/auth.js → enviarReporte().
 export const ANOMALY_TYPES = [
   { id: "danado", label: "Contenedor dañado" },
   { id: "residuos_incorrectos", label: "Residuos que no corresponden" },
   { id: "otro", label: "Otro problema" },
 ];
-
-// Simula el almacenamiento en backend de los reportes ciudadanos.
-// En producción esto sería un POST a la API que alimenta el módulo
-// histórico / trazabilidad de Innova Recicla (RF-03).
-export const anomalyReports = [];
-
-export function submitAnomalyReport({ stationId, stationName, typeId, description }) {
-  const report = {
-    id: `rep-${Date.now()}`,
-    stationId,
-    stationName,
-    typeId,
-    description: description?.trim() || "",
-    createdAt: new Date().toISOString(),
-  };
-  anomalyReports.push(report);
-  return report;
-}
 
 // ---------------------------------------------------------------------
 // RF-06 · Validación e incentivo por reciclaje (escaneo QR)

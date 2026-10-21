@@ -15,6 +15,16 @@ npm run dev
 
 Luego abre `http://localhost:5174` (puerto fijo distinto al de EcoSmart, para poder correr ambas apps a la vez).
 
+## Conexión con el backend
+
+El **Panel de Control Operativo** (perfil Administrador) muestra datos reales del backend y se actualiza solo cuando llega una lectura nueva (último % de llenado, señal "Sin reporte" y alertas ≥ 80 %).
+
+```bash
+cp .env.example .env     # VITE_API_URL=http://localhost:5000 (URL del ecosmart-backend)
+```
+
+Levanta primero el backend (ver `ecosmart-backend/README.md`). Si no responde, el panel muestra el error y un botón para reintentar.
+
 ## Build de producción
 
 ```bash

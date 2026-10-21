@@ -1,0 +1,2031 @@
+diff --git a/ecosmart-backend/.env.example b/ecosmart-backend/.env.example
+new file mode 100644
+index 0000000..46f797a
+--- /dev/null
++++ b/ecosmart-backend/.env.example
+@@ -0,0 +1,20 @@
++PORT=5000
++# Cadena de conexión de Supabase (Project Settings → Database)
++DATABASE_URL=postgresql://usuario:clave@host:5432/postgres
++# SSL activo por defecto (Supabase lo exige). Solo para una BD local sin SSL: DATABASE_SSL=false
++
++# Clave que debe enviar quien reporta lecturas (ESP32 / gateway).
++# Genera una con: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
++INGEST_API_KEY=cambia-esto-por-una-clave-larga
++
++# Regla de alerta (%) y señal "sin reporte" (horas sin lectura)
++UMBRAL_ALERTA=80
++SIN_REPORTE_HORAS=6
++
++# --- Firebase (opcional): dejar vacío para aceptar solo la API key ---
++FIREBASE_PROJECT_ID=
++# Solo se aceptan tokens de usuarios con permiso: claim personalizado ingest=true, o UIDs separados por coma
++FIREBASE_INGEST_UIDS=
++
++# Detrás de un proxy (Render, Railway...) para que el límite de solicitudes use la IP real
++# TRUST_PROXY=1
+diff --git a/ecosmart-backend/.env.test b/ecosmart-backend/.env.test
+new file mode 100644
+index 0000000..3ec5ad4
+--- /dev/null
++++ b/ecosmart-backend/.env.test
+@@ -0,0 +1,10 @@
++NODE_ENV=test
++# BD LOCAL de pruebas. El setup BORRA todo el esquema public, por eso se niega a correr si no es localhost.
++DATABASE_URL=postgresql://eco:eco@localhost:5432/ecosmart_test
++DATABASE_SSL=false
++INGEST_API_KEY=clave-de-prueba-0123456789abcdef
++UMBRAL_ALERTA=80
++SIN_REPORTE_HORAS=6
++FIREBASE_PROJECT_ID=demo-ecosmart
++FIREBASE_JWKS_URL=http://localhost:4999/jwks
++FIREBASE_INGEST_UIDS=uid-gateway-permitido
+diff --git a/ecosmart-backend/README.md b/ecosmart-backend/README.md
+new file mode 100644
+index 0000000..16c29c5
+--- /dev/null
++++ b/ecosmart-backend/README.md
+@@ -0,0 +1,73 @@
++# EcoSmart · Backend
++
++Node.js 22+ · Express 5 · PostgreSQL (Supabase). Recibe las lecturas de llenado de los contenedores, aplica la regla de alerta y avisa en vivo al panel de la app.
++
++## Puesta en marcha
++
++```bash
++npm install
++cp .env.example .env        # completa DATABASE_URL e INGEST_API_KEY
++```
++
++1. **Migración (una vez):** en Supabase → *SQL Editor*, pega y ejecuta `sql/01_migracion_lecturas.sql`. Es seguro correrla más de una vez. Qué hace:
++   - `alerta_llenado.id_alerta` pasa a autogenerado (si todavía no lo era), sin chocar con ids existentes.
++   - Agrega `porcentaje_disparo` y `fecha_resolucion` a `alerta_llenado`.
++   - **Limpia los duplicados** que generaba el código anterior (una alerta `pendiente` por *cada* lectura ≥ 80 %): deja la más antigua por contenedor y marca las demás como `duplicada`. No borra nada.
++   - Crea el índice único que impide más de una alerta `pendiente` por contenedor.
++2. `npm run dev` (o `npm start`) → http://localhost:5000
++
++## Enviar una lectura (ESP32 / gateway / simulación)
++
++```
++POST /api/lecturas
++Authorization: Bearer <INGEST_API_KEY>
++Content-Type: application/json
++
++{ "id_contenedor": 3, "porcentaje_llenado": 82.5, "fecha_lectura": "2026-10-21T14:05:00Z" }
++```
++
++`fecha_lectura` es opcional (ISO 8601); si falta se usa la hora del servidor. Los números van como número JSON, no como texto.
++
++| Código | Significado |
++|---|---|
++| 201 | Lectura guardada. Responde `alerta_creada`, `alerta_resuelta` y el contenedor actualizado |
++| 200 | `recibida: false`: llegó una lectura más antigua que la ya guardada (se ignora) |
++| 400 | JSON mal formado |
++| 401 | Credencial ausente, inválida o expirada |
++| 403 | Token de Firebase válido pero sin permiso para enviar lecturas |
++| 404 | El contenedor no existe |
++| 422 | Validación: porcentaje fuera de 0–100, tipos incorrectos, campos extra, fecha futura |
++| 429 | Demasiadas solicitudes (`RATE_LIMIT_POR_MINUTO`, 600 por IP) |
++
++La ruta antigua `PUT /api/contenedores/:id/nivel` (body `{ "porcentaje_llenado": 82 }`) sigue funcionando y usa **la misma lógica**, pero ahora también exige credencial.
++
++Otras rutas (lectura, públicas): `GET /api/contenedores`, `GET /api/alertas?estado=pendiente|resuelta|duplicada`, `GET /api/alertas/pendientes`, `GET /api/config`, y `GET /api/stream` (Server-Sent Events; el panel lo usa para actualizarse solo).
++
++## Regla de alerta
++
++- `porcentaje >= UMBRAL_ALERTA` (80) → se crea una alerta `pendiente` **solo si el contenedor no tiene ya una**. La garantía está en la base de datos (índice único parcial), así que dos lecturas simultáneas tampoco duplican.
++- `porcentaje < UMBRAL_ALERTA` → la alerta pendiente pasa a `resuelta`. Si luego vuelve a subir, nace una nueva.
++- `estado_operativo` conserva la regla anterior: `critico` (≥ umbral), `atencion` (≥ 50), `disponible`.
++- **Sin reporte:** un contenedor sin lectura hace más de `SIN_REPORTE_HORAS` (6), o que nunca reportó, se marca `sin_reporte: true`.
++- Los `TIMESTAMP` se guardan y se leen en **UTC**.
++
++## Quién puede enviar lecturas
++
++1. **API key** (`INGEST_API_KEY`) en `Authorization: Bearer ...` → pensada para el ESP32 / gateway.
++2. **Token de Firebase** (opcional, si defines `FIREBASE_PROJECT_ID`): se verifica firma, proyecto y expiración. Un token válido **no basta**: todos los ciudadanos de la app tienen uno y podrían falsear niveles de llenado. Solo se acepta si trae el claim personalizado `ingest: true` (asígnalo con el Admin SDK a una cuenta de servicio) o si su UID está en `FIREBASE_INGEST_UIDS`.
++
++## Pruebas
++
++Requieren un PostgreSQL **local** con una base vacía llamada `ecosmart_test` (ajusta usuario/clave en `.env.test`):
++
++```bash
++createdb ecosmart_test
++npm test
++```
++
++`npm test` primero reconstruye esa base (esquema base + migración + datos de ejemplo). **Borra todo el esquema `public`**, por eso se niega a correr si `DATABASE_URL` no es de `localhost` y no tiene "test" en el nombre: no puede tocar Supabase por accidente.
++
++## Pendientes de seguridad (fuera de esta entrega)
++
++- `POST /api/usuarios/deposito` no tiene autenticación y toma `ecopoints_otorgados` del cliente: cualquiera puede abonar puntos a cualquier usuario.
++- Las rutas `GET` son públicas y el login de la app móvil es simulado (el rol "Administrador" se elige con un botón). El panel no está protegido.
+diff --git a/ecosmart-backend/index.js b/ecosmart-backend/index.js
+index cc11028..4665cf1 100644
+--- a/ecosmart-backend/index.js
++++ b/ecosmart-backend/index.js
+@@ -2,32 +2,59 @@ const express = require('express');
+ const cors = require('cors');
+ require('dotenv').config();
+ 
++const config = require('./src/config/config');
+ const contenedorRoutes = require('./src/routes/contenedorRoutes');
+ const alertaRoutes = require('./src/routes/alertaRoutes');
+ const usuarioRoutes = require('./src/routes/usuarioRoutes');
++const lecturaRoutes = require('./src/routes/lecturaRoutes');
++const streamRoutes = require('./src/routes/streamRoutes');
+ 
+ const app = express();
+ const PORT = process.env.PORT || 5000;
+ 
++// Detrás de un proxy (Render, Railway, Nginx...) define TRUST_PROXY=1 para que el límite de solicitudes use la IP real.
++if (process.env.TRUST_PROXY) {
++  app.set('trust proxy', Number.isNaN(Number(process.env.TRUST_PROXY)) ? process.env.TRUST_PROXY : Number(process.env.TRUST_PROXY));
++}
++
+ // Middlewares
+ app.use(cors());
+-app.use(express.json());
++app.use(express.json({ limit: '10kb' }));
+ 
+ // Rutas de la API
+ app.use('/api/contenedores', contenedorRoutes);
+ app.use('/api/alertas', alertaRoutes);
+ app.use('/api/usuarios', usuarioRoutes);
++app.use('/api/lecturas', lecturaRoutes);
++app.use('/api/stream', streamRoutes);
++
++// Parámetros que el panel necesita para interpretar los datos
++app.get('/api/config', (req, res) => {
++  res.json({ umbral_alerta: config.umbralAlerta, sin_reporte_horas: config.sinReporteHoras });
++});
+ 
+ // Ruta Raíz
+ app.get('/', (req, res) => {
+-  res.json({ 
+-    proyecto: 'EcoSmart API Backend', 
++  res.json({
++    proyecto: 'EcoSmart API Backend',
+     estado: 'En ejecución',
+     puerto: PORT
+   });
+ });
+ 
+-// Iniciar Servidor
+-app.listen(PORT, () => {
+-  console.log(` Servidor Backend ejecutándose en el puerto ${PORT}`);
+-});
+\ No newline at end of file
++// Errores no controlados (JSON inválido, fallas internas)
++app.use((err, req, res, next) => {
++  if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'json_invalido' });
++  if (err.type === 'entity.too.large') return res.status(413).json({ error: 'cuerpo_demasiado_grande' });
++  console.error(err);
++  res.status(500).json({ error: 'error_interno' });
++});
++
++// Iniciar Servidor (solo si se ejecuta directamente; los tests importan `app` sin abrir el puerto)
++if (require.main === module) {
++  app.listen(PORT, () => {
++    console.log(` Servidor Backend ejecutándose en el puerto ${PORT}`);
++  });
++}
++
++module.exports = app;
+diff --git a/ecosmart-backend/package-lock.json b/ecosmart-backend/package-lock.json
+index fd12998..05e966d 100644
+--- a/ecosmart-backend/package-lock.json
++++ b/ecosmart-backend/package-lock.json
+@@ -12,7 +12,10 @@
+         "cors": "^2.8.6",
+         "dotenv": "^18.0.4",
+         "express": "^5.2.1",
+-        "pg": "^8.23.0"
++        "express-rate-limit": "^7.5.1",
++        "jose": "^5.10.0",
++        "pg": "^8.23.0",
++        "zod": "^3.25.76"
+       },
+       "devDependencies": {
+         "nodemon": "^3.1.14"
+@@ -409,6 +412,21 @@
+         "url": "https://opencollective.com/express"
+       }
+     },
++    "node_modules/express-rate-limit": {
++      "version": "7.5.1",
++      "resolved": "https://registry.npmjs.org/express-rate-limit/-/express-rate-limit-7.5.1.tgz",
++      "integrity": "sha512-7iN8iPMDzOMHPUYllBEsQdWVB6fPDMPqwjBaFrgr4Jgr/+okjvzAy+UHlYYL/Vs0OsOrMkwS6PJDkFlJwoxUnw==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 16"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/express-rate-limit"
++      },
++      "peerDependencies": {
++        "express": ">= 4.11"
++      }
++    },
+     "node_modules/fill-range": {
+       "version": "7.1.1",
+       "resolved": "https://registry.npmjs.org/fill-range/-/fill-range-7.1.1.tgz",
+@@ -691,6 +709,15 @@
+       "integrity": "sha512-hvpoI6korhJMnej285dSg6nu1+e6uxs7zG3BYAm5byqDsgJNWwxzM6z6iZiAgQR4TJ30JmBTOwqZUw3WlyH3AQ==",
+       "license": "MIT"
+     },
++    "node_modules/jose": {
++      "version": "5.10.0",
++      "resolved": "https://registry.npmjs.org/jose/-/jose-5.10.0.tgz",
++      "integrity": "sha512-s+3Al/p9g32Iq+oqXxkW//7jk2Vig6FF1CFqzVXoTUXt2qz89YWbL+OwS17NFYEvxC35n0FKeGO2LGYSxeM2Gg==",
++      "license": "MIT",
++      "funding": {
++        "url": "https://github.com/sponsors/panva"
++      }
++    },
+     "node_modules/math-intrinsics": {
+       "version": "1.1.0",
+       "resolved": "https://registry.npmjs.org/math-intrinsics/-/math-intrinsics-1.1.0.tgz",
+@@ -1427,6 +1454,15 @@
+       "engines": {
+         "node": ">=0.4"
+       }
++    },
++    "node_modules/zod": {
++      "version": "3.25.76",
++      "resolved": "https://registry.npmjs.org/zod/-/zod-3.25.76.tgz",
++      "integrity": "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==",
++      "license": "MIT",
++      "funding": {
++        "url": "https://github.com/sponsors/colinhacks"
++      }
+     }
+   }
+ }
+diff --git a/ecosmart-backend/package.json b/ecosmart-backend/package.json
+index a265f00..f69f2be 100644
+--- a/ecosmart-backend/package.json
++++ b/ecosmart-backend/package.json
+@@ -3,7 +3,13 @@
+   "version": "1.0.0",
+   "main": "index.js",
+   "scripts": {
+-    "test": "echo \"Error: no test specified\" && exit 1"
++    "start": "node index.js",
++    "dev": "nodemon index.js",
++    "pretest": "node --env-file=.env.test scripts/setupTestDb.js",
++    "test": "node --env-file=.env.test --test --test-concurrency=1"
++  },
++  "engines": {
++    "node": ">=22"
+   },
+   "keywords": [],
+   "author": "",
+@@ -13,7 +19,10 @@
+     "cors": "^2.8.6",
+     "dotenv": "^18.0.4",
+     "express": "^5.2.1",
+-    "pg": "^8.23.0"
++    "express-rate-limit": "^7.5.1",
++    "jose": "^5.10.0",
++    "pg": "^8.23.0",
++    "zod": "^3.25.76"
+   },
+   "devDependencies": {
+     "nodemon": "^3.1.14"
+diff --git a/ecosmart-backend/scripts/setupTestDb.js b/ecosmart-backend/scripts/setupTestDb.js
+new file mode 100644
+index 0000000..7eafaca
+--- /dev/null
++++ b/ecosmart-backend/scripts/setupTestDb.js
+@@ -0,0 +1,32 @@
++// Prepara la BD LOCAL de pruebas: esquema base + migración + datos de ejemplo.
++// ¡BORRA todo el esquema public! Por eso se niega a correr contra cualquier BD que no sea local y de pruebas.
++const fs = require('node:fs');
++const path = require('node:path');
++const { Client } = require('pg');
++
++const url = new URL(process.env.DATABASE_URL);
++const esLocal = ['localhost', '127.0.0.1', '[::1]', '::1'].includes(url.hostname);
++const esDePrueba = url.pathname.replace('/', '').includes('test');
++if (!esLocal || !esDePrueba) {
++  console.error(`✗ Setup cancelado: DATABASE_URL (${url.hostname}${url.pathname}) no es una BD local de pruebas.`);
++  console.error('  Debe ser localhost y el nombre de la base debe contener "test" (ej. ecosmart_test).');
++  process.exit(1);
++}
++
++const archivos = [
++  path.join(__dirname, '..', 'test', 'db', '00_schema_base.sql'),
++  path.join(__dirname, '..', 'sql', '01_migracion_lecturas.sql'),
++  path.join(__dirname, '..', 'test', 'db', '10_seed.sql'),
++];
++
++(async () => {
++  const client = new Client({ connectionString: process.env.DATABASE_URL });
++  await client.connect();
++  await client.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
++  for (const f of archivos) await client.query(fs.readFileSync(f, 'utf8'));
++  await client.end();
++  console.log('✓ BD de pruebas lista (esquema base + migración + seed)');
++})().catch((e) => {
++  console.error('✗ Falló el setup de la BD de pruebas:', e.message);
++  process.exit(1);
++});
+diff --git a/ecosmart-backend/sql/01_migracion_lecturas.sql b/ecosmart-backend/sql/01_migracion_lecturas.sql
+new file mode 100644
+index 0000000..f359325
+--- /dev/null
++++ b/ecosmart-backend/sql/01_migracion_lecturas.sql
+@@ -0,0 +1,54 @@
++-- ============================================================
++-- Migración: recepción de lecturas y alertas de llenado sin duplicados
++-- Ejecutar en Supabase (SQL Editor) o con psql. Se puede correr más de una vez.
++-- Vocabulario de estado_alerta (el mismo que ya usaba el backend):
++--   'pendiente'  alerta activa (a lo más UNA por contenedor)
++--   'resuelta'   el contenedor volvió a bajar del umbral
++--   'duplicada'  alertas repetidas que generaba el código anterior (se conservan, solo se marcan)
++-- ============================================================
++
++-- 1) id_alerta autogenerado, si todavía no lo es. Parte desde el máximo existente para no chocar.
++DO $$
++BEGIN
++  IF EXISTS (SELECT 1 FROM information_schema.columns
++              WHERE table_schema = 'public' AND table_name = 'alerta_llenado'
++                AND column_name = 'id_alerta' AND is_identity = 'NO' AND column_default IS NULL) THEN
++    ALTER TABLE alerta_llenado ALTER COLUMN id_alerta ADD GENERATED BY DEFAULT AS IDENTITY;
++    PERFORM setval(pg_get_serial_sequence('alerta_llenado', 'id_alerta'),
++                   COALESCE((SELECT MAX(id_alerta) FROM alerta_llenado), 0) + 1, false);
++  END IF;
++END $$;
++
++-- 2) Trazabilidad: qué porcentaje disparó la alerta y cuándo se resolvió.
++ALTER TABLE alerta_llenado ADD COLUMN IF NOT EXISTS porcentaje_disparo NUMERIC(5,2);
++ALTER TABLE alerta_llenado ADD COLUMN IF NOT EXISTS fecha_resolucion TIMESTAMP;
++
++-- 3) Limpiar duplicados previos: el código anterior insertaba una alerta 'pendiente' en CADA lectura >= 80 %.
++--    Se conserva la más antigua de cada contenedor y las demás se marcan 'duplicada' (no se borra nada).
++UPDATE alerta_llenado a
++   SET estado_alerta = 'duplicada'
++ WHERE a.estado_alerta = 'pendiente'
++   AND EXISTS (SELECT 1 FROM alerta_llenado b
++                WHERE b.id_contenedor = a.id_contenedor
++                  AND b.estado_alerta = 'pendiente'
++                  AND b.id_alerta < a.id_alerta);
++
++-- 4) CLAVE DEL "SIN DUPLICADOS": a lo más una alerta 'pendiente' por contenedor.
++--    Aunque lleguen dos lecturas a la vez, la base de datos lo garantiza.
++CREATE UNIQUE INDEX IF NOT EXISTS uq_alerta_pendiente_por_contenedor
++  ON alerta_llenado (id_contenedor)
++  WHERE estado_alerta = 'pendiente';
++
++-- 5) Porcentaje siempre entre 0 y 100 (NOT VALID: se exige en lecturas nuevas sin revisar filas antiguas).
++DO $$
++BEGIN
++  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_contenedor_porcentaje') THEN
++    ALTER TABLE contenedor
++      ADD CONSTRAINT chk_contenedor_porcentaje CHECK (porcentaje_llenado BETWEEN 0 AND 100) NOT VALID;
++  END IF;
++END $$;
++
++-- 6) Consultas rápidas del panel.
++CREATE INDEX IF NOT EXISTS idx_alerta_estado_fecha ON alerta_llenado (estado_alerta, fecha_generacion DESC);
++
++-- NOTA: los TIMESTAMP se guardan en UTC (el backend los escribe y lee así).
+diff --git a/ecosmart-backend/src/config/config.js b/ecosmart-backend/src/config/config.js
+new file mode 100644
+index 0000000..99e3130
+--- /dev/null
++++ b/ecosmart-backend/src/config/config.js
+@@ -0,0 +1,33 @@
++require('dotenv').config();
++
++const num = (v, d) => (v !== undefined && v !== '' && !Number.isNaN(Number(v)) ? Number(v) : d);
++
++const config = {
++  // Umbral de alerta de llenado (%). Es el mismo 80 % de RF-02.
++  umbralAlerta: num(process.env.UMBRAL_ALERTA, 80),
++  // Horas sin lectura para marcar un contenedor como "Sin reporte".
++  sinReporteHoras: num(process.env.SIN_REPORTE_HORAS, 6),
++
++  // Quién puede enviar lecturas (ver src/middleware/ingestAuth.js).
++  apiKey: process.env.INGEST_API_KEY,
++  firebaseProjectId: process.env.FIREBASE_PROJECT_ID || null,
++  firebaseJwksUrl:
++    process.env.FIREBASE_JWKS_URL ||
++    'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com',
++  firebaseIngestUids: (process.env.FIREBASE_INGEST_UIDS || '')
++    .split(',')
++    .map((x) => x.trim())
++    .filter(Boolean),
++
++  // Límite de lecturas por minuto y por IP.
++  rateLimitPorMinuto: num(process.env.RATE_LIMIT_POR_MINUTO, 600),
++};
++
++if (!config.apiKey || config.apiKey.length < 16) {
++  throw new Error(
++    'Falta INGEST_API_KEY (mínimo 16 caracteres). Genera una con: ' +
++      "node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\" y agrégala al .env"
++  );
++}
++
++module.exports = config;
+diff --git a/ecosmart-backend/src/config/db.js b/ecosmart-backend/src/config/db.js
+index 2e8c25c..4af9a4b 100644
+--- a/ecosmart-backend/src/config/db.js
++++ b/ecosmart-backend/src/config/db.js
+@@ -1,11 +1,14 @@
+-const { Pool } = require('pg');
++const { Pool, types } = require('pg');
+ require('dotenv').config();
+ 
++// Los TIMESTAMP (sin zona) se guardan y se leen SIEMPRE en UTC. Sin esto, node-postgres los
++// interpretaría en la zona horaria del equipo donde corre el servidor y "hace X horas" saldría corrido.
++types.setTypeParser(1114, (v) => (v === null ? null : new Date(v.replace(' ', 'T') + 'Z')));
++
+ const pool = new Pool({
+   connectionString: process.env.DATABASE_URL,
+-  ssl: {
+-    rejectUnauthorized: false
+-  }
++  // Supabase exige SSL (por defecto activo, igual que antes). Para una BD local sin SSL: DATABASE_SSL=false
++  ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
+ });
+ 
+ pool.on('connect', () => {
+@@ -16,4 +19,4 @@ pool.on('error', (err) => {
+   console.error(' Error en la conexión a la Base de Datos:', err);
+ });
+ 
+-module.exports = pool;
+\ No newline at end of file
++module.exports = pool;
+diff --git a/ecosmart-backend/src/controllers/alertasController.js b/ecosmart-backend/src/controllers/alertasController.js
+index d7492ad..edfdcdd 100644
+--- a/ecosmart-backend/src/controllers/alertasController.js
++++ b/ecosmart-backend/src/controllers/alertasController.js
+@@ -1,28 +1,23 @@
+-const pool = require('../config/db');
++const { listarAlertas } = require('../services/lecturaService');
+ 
+ // Obtener alertas pendientes para Innova Recicla
+ const getAlertasPendientes = async (req, res) => {
+   try {
+-    const query = `
+-      SELECT 
+-        a.id_alerta, 
+-        a.fecha_generacion, 
+-        a.estado_alerta,
+-        c.id_contenedor,
+-        c.porcentaje_llenado,
+-        c.latitud,
+-        c.longitud
+-      FROM alerta_llenado a
+-      JOIN contenedor c ON a.id_contenedor = c.id_contenedor
+-      WHERE a.estado_alerta = 'pendiente'
+-      ORDER BY a.fecha_generacion DESC
+-    `;
+-    const result = await pool.query(query);
+-    res.json(result.rows);
++    res.json(await listarAlertas('pendiente'));
+   } catch (err) {
+     console.error('Error al obtener alertas:', err.message);
+     res.status(500).json({ error: 'Error en la consulta' });
+   }
+ };
+ 
+-module.exports = { getAlertasPendientes };
+\ No newline at end of file
++// Alertas de cualquier estado (el panel muestra pendientes + historial reciente).
++const getAlertas = async (req, res) => {
++  try {
++    res.json(await listarAlertas(req.query.estado));
++  } catch (err) {
++    console.error('Error al obtener alertas:', err.message);
++    res.status(500).json({ error: 'Error en la consulta' });
++  }
++};
++
++module.exports = { getAlertasPendientes, getAlertas };
+diff --git a/ecosmart-backend/src/controllers/contenedorController.js b/ecosmart-backend/src/controllers/contenedorController.js
+index 46ba4e6..a7c7ada 100644
+--- a/ecosmart-backend/src/controllers/contenedorController.js
++++ b/ecosmart-backend/src/controllers/contenedorController.js
+@@ -1,63 +1,26 @@
+-const pool = require('../config/db');
++const { listarContenedores } = require('../services/lecturaService');
++const { aplicarLectura } = require('./lecturaController');
+ 
+-// Obtener todos los contenedores con su tipo de material
++// Obtener todos los contenedores con su tipo de material, último % de llenado,
++// si tienen alerta pendiente (alerta_activa) y si están sin reporte (sin_reporte).
+ const getContenedores = async (req, res) => {
+   try {
+-    const query = `
+-      SELECT 
+-        c.id_contenedor, 
+-        c.latitud, 
+-        c.longitud, 
+-        c.porcentaje_llenado, 
+-        c.estado_operativo, 
+-        c.fecha_ultima_lectura,
+-        m.nombre_material
+-      FROM contenedor c
+-      LEFT JOIN tipo_material m ON c.id_material = m.id_material
+-    `;
+-    const result = await pool.query(query);
+-    res.json(result.rows);
++    res.json(await listarContenedores());
+   } catch (err) {
+     console.error('Error al obtener contenedores:', err.message);
+     res.status(500).json({ error: 'Error en la base de datos' });
+   }
+ };
+ 
+-// Actualizar porcentaje de llenado (Para la lectura del ESP32 o Simulación)
+-const updateNivelLlenado = async (req, res) => {
+-  const { id } = req.params;
+-  const { porcentaje_llenado } = req.body;
+-
+-  try {
+-    let estado_operativo = 'disponible';
+-    if (porcentaje_llenado >= 80) estado_operativo = 'critico';
+-    else if (porcentaje_llenado >= 50) estado_operativo = 'atencion';
+-
+-    const query = `
+-      UPDATE contenedor 
+-      SET porcentaje_llenado = $1, estado_operativo = $2, fecha_ultima_lectura = NOW() 
+-      WHERE id_contenedor = $3 
+-      RETURNING *
+-    `;
+-    const result = await pool.query(query, [porcentaje_llenado, estado_operativo, id]);
+-
+-    if (result.rows.length === 0) {
+-      return res.status(404).json({ error: 'Contenedor no encontrado' });
+-    }
+-
+-    // Generar alerta de llenado si supera el 80%
+-    if (porcentaje_llenado >= 80) {
+-      await pool.query(
+-        'INSERT INTO alerta_llenado (id_contenedor, estado_alerta) VALUES ($1, $2)',
+-        [id, 'pendiente']
+-      );
+-    }
+-
+-    res.json({ mensaje: 'Lectura actualizada', contenedor: result.rows[0] });
+-  } catch (err) {
+-    console.error('Error al actualizar llenado:', err.message);
+-    res.status(500).json({ error: 'Error al actualizar el contenedor' });
+-  }
+-};
+-
+-module.exports = { getContenedores, updateNivelLlenado };
+\ No newline at end of file
++// Actualizar porcentaje de llenado (Para la lectura del ESP32 o Simulación).
++// Misma lógica que POST /api/lecturas: valida, guarda la lectura y aplica la regla de alerta ≥ 80 %
++// sin duplicados. La ruta exige credencial (ver contenedorRoutes.js).
++const updateNivelLlenado = (req, res, next) =>
++  aplicarLectura(
++    { id_contenedor: Number(req.params.id), porcentaje_llenado: req.body?.porcentaje_llenado },
++    res,
++    next,
++    { okStatus: 200, conMensaje: true }
++  );
++
++module.exports = { getContenedores, updateNivelLlenado };
+diff --git a/ecosmart-backend/src/controllers/lecturaController.js b/ecosmart-backend/src/controllers/lecturaController.js
+new file mode 100644
+index 0000000..6a0bd0a
+--- /dev/null
++++ b/ecosmart-backend/src/controllers/lecturaController.js
+@@ -0,0 +1,36 @@
++const { lecturaSchema, registrarLectura } = require('../services/lecturaService');
++
++/**
++ * Valida y guarda una lectura. Lo comparten:
++ *  - POST /api/lecturas             (contrato nuevo, responde 201)
++ *  - PUT  /api/contenedores/:id/nivel (ruta antigua del ESP32/simulación, responde 200)
++ */
++async function aplicarLectura(input, res, next, { okStatus = 201, conMensaje = false } = {}) {
++  const parsed = lecturaSchema.safeParse(input);
++  if (!parsed.success) {
++    return res.status(422).json({
++      error: 'validacion',
++      detalles: parsed.error.issues.map((i) => ({ campo: i.path.join('.'), mensaje: i.message })),
++    });
++  }
++  try {
++    const r = await registrarLectura(parsed.data);
++    if (r.estado === 'no_encontrado') return res.status(404).json({ error: 'contenedor_no_encontrado' });
++    if (r.estado === 'obsoleta') {
++      return res.status(200).json({ recibida: false, motivo: 'lectura_mas_antigua_que_la_registrada' });
++    }
++    return res.status(okStatus).json({
++      ...(conMensaje ? { mensaje: 'Lectura actualizada' } : {}),
++      recibida: true,
++      alerta_creada: r.alertaCreada,
++      alerta_resuelta: r.alertaResuelta,
++      contenedor: r.contenedor,
++    });
++  } catch (err) {
++    return next(err);
++  }
++}
++
++const crearLectura = (req, res, next) => aplicarLectura(req.body, res, next);
++
++module.exports = { aplicarLectura, crearLectura };
+diff --git a/ecosmart-backend/src/events/bus.js b/ecosmart-backend/src/events/bus.js
+new file mode 100644
+index 0000000..cc858eb
+--- /dev/null
++++ b/ecosmart-backend/src/events/bus.js
+@@ -0,0 +1,8 @@
++const { EventEmitter } = require('node:events');
++
++// Bus interno: el servicio de lecturas publica, el stream SSE (/api/stream) reenvía al panel.
++// Si algún día hay varias instancias del servidor, reemplazar por Postgres LISTEN/NOTIFY o Redis.
++const bus = new EventEmitter();
++bus.setMaxListeners(200);
++
++module.exports = bus;
+diff --git a/ecosmart-backend/src/middleware/ingestAuth.js b/ecosmart-backend/src/middleware/ingestAuth.js
+new file mode 100644
+index 0000000..9e910eb
+--- /dev/null
++++ b/ecosmart-backend/src/middleware/ingestAuth.js
+@@ -0,0 +1,53 @@
++const { createHash, timingSafeEqual } = require('node:crypto');
++const { createRemoteJWKSet, jwtVerify } = require('jose');
++const config = require('../config/config');
++
++const sha = (s) => createHash('sha256').update(s).digest();
++const esperada = sha(config.apiKey);
++
++const jwks = config.firebaseProjectId ? createRemoteJWKSet(new URL(config.firebaseJwksUrl)) : null;
++
++/**
++ * Quién puede enviar lecturas de llenado:
++ *  1) Un dispositivo / gateway (ESP32) con la API key: "Authorization: Bearer <INGEST_API_KEY>".
++ *  2) (Opcional) Un ID token de Firebase válido de ESTE proyecto Y con permiso explícito:
++ *     claim personalizado `ingest: true`, o UID listado en FIREBASE_INGEST_UIDS.
++ *
++ * Un token de Firebase válido NO basta: todos los ciudadanos de la app lo tienen. Si bastara,
++ * cualquier usuario podría falsear niveles de llenado y disparar alertas.
++ */
++async function requireIngestAuth(req, res, next) {
++  const header = req.get('authorization') || '';
++  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
++  if (!token) {
++    return res.status(401).json({ error: 'no_autorizado', mensaje: 'Falta el encabezado Authorization: Bearer' });
++  }
++
++  if (timingSafeEqual(sha(token), esperada)) {
++    req.auth = { tipo: 'api_key' };
++    return next();
++  }
++
++  if (jwks && token.split('.').length === 3) {
++    let payload;
++    try {
++      ({ payload } = await jwtVerify(token, jwks, {
++        issuer: `https://securetoken.google.com/${config.firebaseProjectId}`,
++        audience: config.firebaseProjectId,
++        algorithms: ['RS256'],
++      }));
++      if (!payload.sub) throw new Error('sin sub');
++    } catch {
++      return res.status(401).json({ error: 'no_autorizado', mensaje: 'Token inválido o expirado' });
++    }
++    if (payload.ingest === true || config.firebaseIngestUids.includes(payload.sub)) {
++      req.auth = { tipo: 'firebase', uid: payload.sub };
++      return next();
++    }
++    return res.status(403).json({ error: 'sin_permiso', mensaje: 'Este usuario no puede enviar lecturas' });
++  }
++
++  return res.status(401).json({ error: 'no_autorizado', mensaje: 'Credencial inválida' });
++}
++
++module.exports = { requireIngestAuth };
+diff --git a/ecosmart-backend/src/middleware/rateLimit.js b/ecosmart-backend/src/middleware/rateLimit.js
+new file mode 100644
+index 0000000..dba75ad
+--- /dev/null
++++ b/ecosmart-backend/src/middleware/rateLimit.js
+@@ -0,0 +1,15 @@
++const rateLimit = require('express-rate-limit');
++const config = require('../config/config');
++
++// Límite por IP para los endpoints que reciben lecturas.
++// Si el backend corre detrás de un proxy (Render, Railway, Nginx...), define TRUST_PROXY en el .env
++// para que la IP sea la del cliente y no la del proxy (ver index.js).
++const limiteLecturas = rateLimit({
++  windowMs: 60_000,
++  limit: config.rateLimitPorMinuto,
++  standardHeaders: 'draft-7',
++  legacyHeaders: false,
++  message: { error: 'demasiadas_solicitudes' },
++});
++
++module.exports = { limiteLecturas };
+diff --git a/ecosmart-backend/src/routes/alertaRoutes.js b/ecosmart-backend/src/routes/alertaRoutes.js
+index 4929bbf..f339586 100644
+--- a/ecosmart-backend/src/routes/alertaRoutes.js
++++ b/ecosmart-backend/src/routes/alertaRoutes.js
+@@ -1,7 +1,9 @@
+ const express = require('express');
+ const router = express.Router();
+-const { getAlertasPendientes } = require('../controllers/alertaController');
++// Corregido: el archivo se llama alertasController.js (antes se importaba "alertaController" y el servidor no arrancaba).
++const { getAlertasPendientes, getAlertas } = require('../controllers/alertasController');
+ 
+ router.get('/pendientes', getAlertasPendientes);
++router.get('/', getAlertas); // ?estado=pendiente|resuelta|duplicada
+ 
+-module.exports = router;
+\ No newline at end of file
++module.exports = router;
+diff --git a/ecosmart-backend/src/routes/contenedorRoutes.js b/ecosmart-backend/src/routes/contenedorRoutes.js
+index cf9de4d..b858daf 100644
+--- a/ecosmart-backend/src/routes/contenedorRoutes.js
++++ b/ecosmart-backend/src/routes/contenedorRoutes.js
+@@ -1,8 +1,11 @@
+ const express = require('express');
+ const router = express.Router();
+ const { getContenedores, updateNivelLlenado } = require('../controllers/contenedorController');
++const { requireIngestAuth } = require('../middleware/ingestAuth');
++const { limiteLecturas } = require('../middleware/rateLimit');
+ 
+ router.get('/', getContenedores);
+-router.put('/:id/nivel', updateNivelLlenado);
++// Ruta antigua para lecturas del ESP32 / simulación. Ahora exige credencial (API key) igual que POST /api/lecturas.
++router.put('/:id/nivel', limiteLecturas, requireIngestAuth, updateNivelLlenado);
+ 
+-module.exports = router;
+\ No newline at end of file
++module.exports = router;
+diff --git a/ecosmart-backend/src/routes/lecturaRoutes.js b/ecosmart-backend/src/routes/lecturaRoutes.js
+new file mode 100644
+index 0000000..6987a9d
+--- /dev/null
++++ b/ecosmart-backend/src/routes/lecturaRoutes.js
+@@ -0,0 +1,10 @@
++const express = require('express');
++const router = express.Router();
++const { crearLectura } = require('../controllers/lecturaController');
++const { requireIngestAuth } = require('../middleware/ingestAuth');
++const { limiteLecturas } = require('../middleware/rateLimit');
++
++// Recepción de lecturas (ESP32 / gateway / app autorizada)
++router.post('/', limiteLecturas, requireIngestAuth, crearLectura);
++
++module.exports = router;
+diff --git a/ecosmart-backend/src/routes/streamRoutes.js b/ecosmart-backend/src/routes/streamRoutes.js
+new file mode 100644
+index 0000000..bccb0b8
+--- /dev/null
++++ b/ecosmart-backend/src/routes/streamRoutes.js
+@@ -0,0 +1,28 @@
++const express = require('express');
++const bus = require('../events/bus');
++
++const router = express.Router();
++
++// Actualización automática del panel: Server-Sent Events.
++// Cada lectura confirmada llega como `event: lectura` con { contenedor, alerta_creada, alerta_resuelta }.
++router.get('/', (req, res) => {
++  res.set({
++    'Content-Type': 'text/event-stream',
++    'Cache-Control': 'no-cache, no-transform',
++    Connection: 'keep-alive',
++    'X-Accel-Buffering': 'no',
++  });
++  res.flushHeaders();
++  res.write('retry: 3000\n\n');
++
++  const onLectura = (data) => res.write(`event: lectura\ndata: ${JSON.stringify(data)}\n\n`);
++  bus.on('lectura', onLectura);
++  const ping = setInterval(() => res.write(': ping\n\n'), 25_000);
++
++  req.on('close', () => {
++    clearInterval(ping);
++    bus.off('lectura', onLectura);
++  });
++});
++
++module.exports = router;
+diff --git a/ecosmart-backend/src/services/lecturaService.js b/ecosmart-backend/src/services/lecturaService.js
+new file mode 100644
+index 0000000..1e71fcd
+--- /dev/null
++++ b/ecosmart-backend/src/services/lecturaService.js
+@@ -0,0 +1,173 @@
++const { z } = require('zod');
++const pool = require('../config/db');
++const config = require('../config/config');
++const bus = require('../events/bus');
++
++const UTC_NOW = "(NOW() AT TIME ZONE 'UTC')";
++
++// ---------------------------------------------------------------------------
++// Validación de la lectura que envía el sensor (ESP32) o la app
++// ---------------------------------------------------------------------------
++const lecturaSchema = z
++  .object({
++    id_contenedor: z.number().int().positive(),
++    porcentaje_llenado: z.number().min(0).max(100),
++    // Opcional: cuándo se midió (ISO 8601). Si no viene, se usa la hora del servidor.
++    fecha_lectura: z.string().datetime({ offset: true }).optional(),
++  })
++  .strict()
++  .refine((d) => !d.fecha_lectura || new Date(d.fecha_lectura).getTime() <= Date.now() + 5 * 60_000, {
++    message: 'fecha_lectura no puede estar en el futuro',
++    path: ['fecha_lectura'],
++  });
++
++// Mismos estados operativos que ya usaba el backend: disponible / atencion / critico.
++function estadoOperativo(p) {
++  if (p >= config.umbralAlerta) return 'critico';
++  if (p >= 50) return 'atencion';
++  return 'disponible';
++}
++
++// ---------------------------------------------------------------------------
++// Lectura de contenedores y alertas
++// ---------------------------------------------------------------------------
++const SELECT_CONTENEDOR = `
++  SELECT c.id_contenedor, c.id_material, m.nombre_material, c.latitud, c.longitud,
++         c.porcentaje_llenado, c.fecha_ultima_lectura, c.estado_operativo,
++         EXISTS (SELECT 1 FROM alerta_llenado a
++                  WHERE a.id_contenedor = c.id_contenedor AND a.estado_alerta = 'pendiente') AS alerta_activa
++    FROM contenedor c
++    LEFT JOIN tipo_material m ON m.id_material = c.id_material`;
++
++function aDTO(row) {
++  const ult = row.fecha_ultima_lectura ? new Date(row.fecha_ultima_lectura) : null;
++  const limiteMs = config.sinReporteHoras * 3_600_000;
++  return {
++    id_contenedor: row.id_contenedor,
++    id_material: row.id_material,
++    nombre_material: row.nombre_material,
++    latitud: row.latitud === null ? null : Number(row.latitud),
++    longitud: row.longitud === null ? null : Number(row.longitud),
++    porcentaje_llenado: Number(row.porcentaje_llenado),
++    fecha_ultima_lectura: ult ? ult.toISOString() : null,
++    estado_operativo: row.estado_operativo,
++    alerta_activa: Boolean(row.alerta_activa),
++    // Señal "contenedor sin reporte": nunca reportó, o pasó más del límite sin lectura.
++    sin_reporte: !ult || Date.now() - ult.getTime() > limiteMs,
++  };
++}
++
++async function listarContenedores() {
++  const { rows } = await pool.query(`${SELECT_CONTENEDOR} ORDER BY c.id_contenedor`);
++  return rows.map(aDTO);
++}
++
++const ESTADOS_ALERTA = ['pendiente', 'resuelta', 'duplicada'];
++
++async function listarAlertas(estado) {
++  const filtro = ESTADOS_ALERTA.includes(estado) ? estado : null;
++  const { rows } = await pool.query(
++    `SELECT a.id_alerta, a.id_contenedor, a.fecha_generacion, a.estado_alerta,
++            a.porcentaje_disparo, a.fecha_resolucion,
++            c.porcentaje_llenado, c.latitud, c.longitud, m.nombre_material
++       FROM alerta_llenado a
++       JOIN contenedor c ON c.id_contenedor = a.id_contenedor
++       LEFT JOIN tipo_material m ON m.id_material = c.id_material
++      WHERE ($1::text IS NULL OR a.estado_alerta = $1)
++      ORDER BY a.fecha_generacion DESC NULLS LAST, a.id_alerta DESC
++      LIMIT 200`,
++    [filtro]
++  );
++  return rows.map((r) => ({
++    id_alerta: r.id_alerta,
++    id_contenedor: r.id_contenedor,
++    nombre_material: r.nombre_material,
++    estado_alerta: r.estado_alerta,
++    fecha_generacion: r.fecha_generacion ? new Date(r.fecha_generacion).toISOString() : null,
++    fecha_resolucion: r.fecha_resolucion ? new Date(r.fecha_resolucion).toISOString() : null,
++    porcentaje_disparo: r.porcentaje_disparo === null ? null : Number(r.porcentaje_disparo),
++    porcentaje_llenado: Number(r.porcentaje_llenado),
++    latitud: r.latitud === null ? null : Number(r.latitud),
++    longitud: r.longitud === null ? null : Number(r.longitud),
++  }));
++}
++
++// ---------------------------------------------------------------------------
++// Registrar una lectura + regla de alerta (todo en UNA transacción)
++//  - >= umbral: crea alerta 'pendiente' solo si no hay otra pendiente para ese contenedor.
++//    La garantía "sin duplicados" es el índice único parcial de sql/01_migracion_lecturas.sql.
++//  - <  umbral: la alerta pendiente pasa a 'resuelta'; si vuelve a subir, nace una nueva.
++// ---------------------------------------------------------------------------
++async function registrarLectura({ id_contenedor, porcentaje_llenado, fecha_lectura }) {
++  const fecha = fecha_lectura ? new Date(fecha_lectura) : new Date();
++  const client = await pool.connect();
++  let resultado;
++  try {
++    await client.query('BEGIN');
++    // Todos los TIMESTAMP de esta transacción se escriben en UTC.
++    await client.query("SET LOCAL TIME ZONE 'UTC'");
++
++    // FOR UPDATE serializa lecturas simultáneas del mismo contenedor.
++    const { rows } = await client.query(
++      'SELECT fecha_ultima_lectura FROM contenedor WHERE id_contenedor = $1 FOR UPDATE',
++      [id_contenedor]
++    );
++    if (rows.length === 0) {
++      await client.query('ROLLBACK');
++      return { estado: 'no_encontrado' };
++    }
++    const previa = rows[0].fecha_ultima_lectura;
++    if (previa && fecha < new Date(previa)) {
++      // Llegó una lectura más antigua que la ya guardada (típico al sincronizar offline): se ignora.
++      await client.query('ROLLBACK');
++      return { estado: 'obsoleta' };
++    }
++
++    await client.query(
++      `UPDATE contenedor
++          SET porcentaje_llenado = $2,
++              estado_operativo = $3,
++              fecha_ultima_lectura = ($4::timestamptz AT TIME ZONE 'UTC')
++        WHERE id_contenedor = $1`,
++      [id_contenedor, porcentaje_llenado, estadoOperativo(porcentaje_llenado), fecha.toISOString()]
++    );
++
++    let alertaCreada = false;
++    let alertaResuelta = false;
++    if (porcentaje_llenado >= config.umbralAlerta) {
++      const r = await client.query(
++        `INSERT INTO alerta_llenado (id_contenedor, fecha_generacion, estado_alerta, porcentaje_disparo)
++         VALUES ($1, ${UTC_NOW}, 'pendiente', $2)
++         ON CONFLICT (id_contenedor) WHERE estado_alerta = 'pendiente' DO NOTHING`,
++        [id_contenedor, porcentaje_llenado]
++      );
++      alertaCreada = r.rowCount === 1;
++    } else {
++      const r = await client.query(
++        `UPDATE alerta_llenado SET estado_alerta = 'resuelta', fecha_resolucion = ${UTC_NOW}
++          WHERE id_contenedor = $1 AND estado_alerta = 'pendiente'`,
++        [id_contenedor]
++      );
++      alertaResuelta = r.rowCount > 0;
++    }
++
++    const { rows: fila } = await client.query(`${SELECT_CONTENEDOR} WHERE c.id_contenedor = $1`, [id_contenedor]);
++    await client.query('COMMIT');
++    resultado = { estado: 'ok', alertaCreada, alertaResuelta, contenedor: aDTO(fila[0]) };
++  } catch (err) {
++    await client.query('ROLLBACK').catch(() => {});
++    throw err;
++  } finally {
++    client.release();
++  }
++
++  // Se avisa al panel solo cuando la transacción ya quedó confirmada.
++  bus.emit('lectura', {
++    contenedor: resultado.contenedor,
++    alerta_creada: resultado.alertaCreada,
++    alerta_resuelta: resultado.alertaResuelta,
++  });
++  return resultado;
++}
++
++module.exports = { lecturaSchema, registrarLectura, listarContenedores, listarAlertas, aDTO };
+diff --git a/ecosmart-backend/test/db/00_schema_base.sql b/ecosmart-backend/test/db/00_schema_base.sql
+new file mode 100644
+index 0000000..4ecc88f
+--- /dev/null
++++ b/ecosmart-backend/test/db/00_schema_base.sql
+@@ -0,0 +1,108 @@
++-- Copia del esquema base entregado por el equipo (ecosmart 2.sql). Solo para las pruebas locales.
++-- ============================================================
++-- 1. TABLAS MAESTRAS 
++-- ============================================================
++
++CREATE TABLE Tipo_Material (
++    id_material INT NOT NULL,
++    nombre_material VARCHAR(50) NOT NULL,
++    PRIMARY KEY (id_material)
++);
++
++CREATE TABLE Usuario (
++    id_usuario INT NOT NULL,
++    id_auth VARCHAR(128),
++    rut VARCHAR(12) NOT NULL,
++    nombre_completo VARCHAR(100) NOT NULL,
++    correo VARCHAR(100) NOT NULL,
++    saldo_ecopoints INT NOT NULL,
++    recibe_notificaciones BOOLEAN NOT NULL,
++    fecha_registro TIMESTAMP NOT NULL,
++    PRIMARY KEY (id_usuario)
++);
++
++CREATE TABLE Insignia (
++    id_insignia INT NOT NULL,
++    nombre_insignia VARCHAR(100) NOT NULL,
++    descripcion TEXT,
++    umbral_depositos INT NOT NULL,
++    PRIMARY KEY (id_insignia)
++);
++
++-- ============================================================
++-- 2. CONTENEDOR 
++-- ============================================================
++
++CREATE TABLE Contenedor (
++    id_contenedor INT NOT NULL,
++    id_material INT NOT NULL,
++    latitud DECIMAL(10,8) NOT NULL,
++    longitud DECIMAL(11,8) NOT NULL,
++    porcentaje_llenado DECIMAL(5,2) NOT NULL,
++    fecha_ultima_lectura TIMESTAMP,
++    estado_operativo VARCHAR(20) NOT NULL,
++    PRIMARY KEY (id_contenedor),
++    CONSTRAINT fk_contenedor_material FOREIGN KEY (id_material) REFERENCES Tipo_Material(id_material)
++);
++
++-- ============================================================
++-- 3. GESTIÓN OPERATIVA
++-- ============================================================
++
++CREATE TABLE Alerta_Llenado (
++    id_alerta INT NOT NULL,
++    id_contenedor INT NOT NULL,
++    fecha_generacion TIMESTAMP NOT NULL,
++    estado_alerta VARCHAR(20) NOT NULL,
++    PRIMARY KEY (id_alerta),
++    CONSTRAINT fk_alerta_contenedor FOREIGN KEY (id_contenedor) REFERENCES Contenedor(id_contenedor)
++);
++
++CREATE TABLE Retiro_Historial (
++    id_retiro INT NOT NULL,
++    id_contenedor INT NOT NULL,
++    fecha_retiro TIMESTAMP NOT NULL,
++    nivel_previo_porcentaje DECIMAL(5,2) NOT NULL,
++    PRIMARY KEY (id_retiro),
++    CONSTRAINT fk_retiro_contenedor FOREIGN KEY (id_contenedor) REFERENCES Contenedor(id_contenedor)
++);
++
++-- ============================================================
++-- 4. INTERACCIÓN CIUDADANA
++-- ============================================================
++
++CREATE TABLE Reporte_Anomalia (
++    id_reporte INT NOT NULL,
++    id_usuario INT NOT NULL,
++    id_contenedor INT NOT NULL,
++    descripcion_problema TEXT NOT NULL,
++    fecha_reporte TIMESTAMP NOT NULL,
++    estado_revision VARCHAR(20) NOT NULL,
++    PRIMARY KEY (id_reporte),
++    CONSTRAINT fk_reporte_usuario FOREIGN KEY (id_usuario) REFERENCES Usuario(id_usuario),
++    CONSTRAINT fk_reporte_contenedor FOREIGN KEY (id_contenedor) REFERENCES Contenedor(id_contenedor)
++);
++
++CREATE TABLE Deposito_Residuo (
++    id_deposito INT NOT NULL,
++    id_usuario INT NOT NULL,
++    id_contenedor INT NOT NULL,
++    codigo_qr_escaneado VARCHAR(100) NOT NULL,
++    ecopoints_otorgados INT NOT NULL,
++    fecha_escaneo_offline TIMESTAMP NOT NULL,
++    fecha_sincronizacion TIMESTAMP,
++    PRIMARY KEY (id_deposito),
++    CONSTRAINT unique_codigo_qr UNIQUE (codigo_qr_escaneado),
++    CONSTRAINT fk_deposito_usuario FOREIGN KEY (id_usuario) REFERENCES Usuario(id_usuario),
++    CONSTRAINT fk_deposito_contenedor FOREIGN KEY (id_contenedor) REFERENCES Contenedor(id_contenedor)
++);
++
++CREATE TABLE Logro_Usuario (
++    id_logro INT NOT NULL,
++    id_usuario INT NOT NULL,
++    id_insignia INT NOT NULL,
++    fecha_desbloqueo TIMESTAMP NOT NULL,
++    PRIMARY KEY (id_logro),
++    CONSTRAINT fk_logro_usuario FOREIGN KEY (id_usuario) REFERENCES Usuario(id_usuario),
++    CONSTRAINT fk_logro_insignia FOREIGN KEY (id_insignia) REFERENCES Insignia(id_insignia)
++);
+\ No newline at end of file
+diff --git a/ecosmart-backend/test/db/10_seed.sql b/ecosmart-backend/test/db/10_seed.sql
+new file mode 100644
+index 0000000..9c24419
+--- /dev/null
++++ b/ecosmart-backend/test/db/10_seed.sql
+@@ -0,0 +1,10 @@
++-- Datos de prueba (solo BD local de pruebas)
++INSERT INTO Tipo_Material (id_material, nombre_material) VALUES
++  (1,'Plástico'),(2,'Vidrio'),(3,'Papel y cartón'),(4,'Latas');
++
++INSERT INTO Contenedor (id_contenedor,id_material,latitud,longitud,porcentaje_llenado,fecha_ultima_lectura,estado_operativo) VALUES
++  (101,1,-22.45640000,-68.92290000,35,(NOW() AT TIME ZONE 'UTC') - INTERVAL '10 minutes','disponible'),
++  (102,2,-22.45710000,-68.92110000,62,(NOW() AT TIME ZONE 'UTC') - INTERVAL '25 minutes','atencion'),
++  (103,3,-22.46020000,-68.93010000,81,(NOW() AT TIME ZONE 'UTC') - INTERVAL '5 minutes','critico'),
++  (104,4,-22.46330000,-68.92560000,18,(NOW() AT TIME ZONE 'UTC') - INTERVAL '30 hours','disponible'),
++  (105,1,-22.45290000,-68.91870000,74,NULL,'atencion');
+diff --git a/ecosmart-backend/test/firebase.test.js b/ecosmart-backend/test/firebase.test.js
+new file mode 100644
+index 0000000..c62cccb
+--- /dev/null
++++ b/ecosmart-backend/test/firebase.test.js
+@@ -0,0 +1,75 @@
++const { test, before, after } = require('node:test');
++const assert = require('node:assert/strict');
++const http = require('node:http');
++const { generateKeyPair, exportJWK, SignJWT } = require('jose');
++const app = require('../index');
++const pool = require('../src/config/db');
++
++const PROJECT = process.env.FIREBASE_PROJECT_ID;
++let server, base, jwksServer, privateKey, otherKey;
++
++before(async () => {
++  const pair = await generateKeyPair('RS256');
++  privateKey = pair.privateKey;
++  const jwk = { ...(await exportJWK(pair.publicKey)), kid: 'k1', alg: 'RS256', use: 'sig' };
++  otherKey = (await generateKeyPair('RS256')).privateKey; // clave que Google NO publica
++  // Simula el JWKS de Google (securetoken)
++  jwksServer = http.createServer((_q, r) => {
++    r.setHeader('Content-Type', 'application/json');
++    r.end(JSON.stringify({ keys: [jwk] }));
++  });
++  await new Promise((r) => jwksServer.listen(4999, r));
++  await new Promise((r) => { server = app.listen(0, r); });
++  base = `http://localhost:${server.address().port}`;
++});
++after(async () => { server.close(); jwksServer.close(); await pool.end(); });
++
++const token = ({ key = privateKey, sub = 'uid-cualquiera', aud = PROJECT, iss = `https://securetoken.google.com/${PROJECT}`, exp = '10m', claims = {} } = {}) =>
++  new SignJWT({ role: 'authenticated', ...claims })
++    .setProtectedHeader({ alg: 'RS256', kid: 'k1' })
++    .setSubject(sub).setAudience(aud).setIssuer(iss).setIssuedAt().setExpirationTime(exp).sign(key);
++
++const enviar = (t) =>
++  fetch(`${base}/api/lecturas`, {
++    method: 'POST',
++    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` },
++    body: JSON.stringify({ id_contenedor: 101, porcentaje_llenado: 42 }),
++  });
++
++test('token Firebase válido con claim ingest=true → 201', async () => {
++  assert.equal((await enviar(await token({ claims: { ingest: true } }))).status, 201);
++});
++
++test('UID listado en FIREBASE_INGEST_UIDS → 201', async () => {
++  assert.equal((await enviar(await token({ sub: 'uid-gateway-permitido' }))).status, 201);
++});
++
++test('ciudadano normal (token válido, rol authenticated, sin permiso) → 403', async () => {
++  assert.equal((await enviar(await token())).status, 403);
++});
++
++test('token firmado con otra clave → 401', async () => {
++  assert.equal((await enviar(await token({ key: otherKey, claims: { ingest: true } }))).status, 401);
++});
++
++test('token de otro proyecto de Firebase (audience/issuer distinto) → 401', async () => {
++  assert.equal((await enviar(await token({ aud: 'otro-proyecto', iss: 'https://securetoken.google.com/otro-proyecto', claims: { ingest: true } }))).status, 401);
++});
++
++test('token expirado → 401', async () => {
++  assert.equal((await enviar(await token({ exp: new Date(Date.now() - 60_000), claims: { ingest: true } }))).status, 401);
++});
++
++test('basura que parece JWT → 401; la API key sigue funcionando', async () => {
++  assert.equal((await enviar('aaa.bbb.ccc')).status, 401);
++  assert.equal((await enviar(process.env.INGEST_API_KEY)).status, 201);
++});
++
++test('el token de Firebase también sirve en la ruta antigua PUT /nivel', async () => {
++  const r = await fetch(`${base}/api/contenedores/101/nivel`, {
++    method: 'PUT',
++    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await token({ claims: { ingest: true } })}` },
++    body: JSON.stringify({ porcentaje_llenado: 41 }),
++  });
++  assert.equal(r.status, 200);
++});
+diff --git a/ecosmart-backend/test/lecturas.test.js b/ecosmart-backend/test/lecturas.test.js
+new file mode 100644
+index 0000000..c19e3a4
+--- /dev/null
++++ b/ecosmart-backend/test/lecturas.test.js
+@@ -0,0 +1,225 @@
++const { test, before, after } = require('node:test');
++const assert = require('node:assert/strict');
++const app = require('../index');
++const pool = require('../src/config/db');
++
++const KEY = process.env.INGEST_API_KEY;
++let server, base;
++
++before(async () => {
++  await new Promise((r) => { server = app.listen(0, r); });
++  base = `http://localhost:${server.address().port}`;
++});
++after(async () => { server.close(); await pool.end(); });
++
++const post = (body, key = KEY) =>
++  fetch(`${base}/api/lecturas`, {
++    method: 'POST',
++    headers: { 'Content-Type': 'application/json', ...(key ? { Authorization: `Bearer ${key}` } : {}) },
++    body: JSON.stringify(body),
++  });
++
++const put = (id, body, key = KEY) =>
++  fetch(`${base}/api/contenedores/${id}/nivel`, {
++    method: 'PUT',
++    headers: { 'Content-Type': 'application/json', ...(key ? { Authorization: `Bearer ${key}` } : {}) },
++    body: JSON.stringify(body),
++  });
++
++const pendientes = async (id) =>
++  (await pool.query("SELECT count(*)::int n FROM alerta_llenado WHERE id_contenedor=$1 AND estado_alerta='pendiente'", [id])).rows[0].n;
++
++const limpiar = async (id) => {
++  await pool.query('DELETE FROM alerta_llenado WHERE id_contenedor=$1', [id]);
++  await pool.query("UPDATE contenedor SET porcentaje_llenado=10, estado_operativo='disponible', fecha_ultima_lectura=NULL WHERE id_contenedor=$1", [id]);
++};
++
++// ---------------- Autenticación y validación ----------------
++test('rechaza sin credencial (401) y con key incorrecta (401)', async () => {
++  assert.equal((await post({ id_contenedor: 101, porcentaje_llenado: 50 }, null)).status, 401);
++  assert.equal((await post({ id_contenedor: 101, porcentaje_llenado: 50 }, 'otra-clave-incorrecta-123')).status, 401);
++});
++
++test('validación: rango, tipos, campos extra, fecha futura y cuerpo vacío (422)', async () => {
++  for (const body of [
++    { id_contenedor: 101, porcentaje_llenado: 101 },
++    { id_contenedor: 101, porcentaje_llenado: -1 },
++    { id_contenedor: 101, porcentaje_llenado: '50' },
++    { id_contenedor: 'x', porcentaje_llenado: 50 },
++    { porcentaje_llenado: 50 },
++    { id_contenedor: 101, porcentaje_llenado: 50, extra: 1 },
++    { id_contenedor: 101, porcentaje_llenado: 50, fecha_lectura: new Date(Date.now() + 3_600_000).toISOString() },
++  ]) {
++    assert.equal((await post(body)).status, 422, JSON.stringify(body));
++  }
++  const vacio = await fetch(`${base}/api/lecturas`, { method: 'POST', headers: { Authorization: `Bearer ${KEY}` } });
++  assert.equal(vacio.status, 422);
++});
++
++test('JSON malformado → 400; contenedor inexistente → 404', async () => {
++  const r = await fetch(`${base}/api/lecturas`, {
++    method: 'POST',
++    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${KEY}` },
++    body: '{"id_contenedor": 101,',
++  });
++  assert.equal(r.status, 400);
++  assert.equal((await post({ id_contenedor: 99999, porcentaje_llenado: 50 })).status, 404);
++});
++
++// ---------------- Última lectura, estado operativo, sin reporte ----------------
++test('guarda la última lectura, la devuelve como número y no alerta bajo el umbral', async () => {
++  await limpiar(101);
++  const r = await post({ id_contenedor: 101, porcentaje_llenado: 79.9 });
++  assert.equal(r.status, 201);
++  const j = await r.json();
++  assert.equal(j.alerta_creada, false);
++  assert.equal(j.contenedor.porcentaje_llenado, 79.9);
++  assert.equal(typeof j.contenedor.latitud, 'number');
++  assert.equal(j.contenedor.sin_reporte, false);
++  assert.equal(j.contenedor.estado_operativo, 'atencion');
++});
++
++test('estado_operativo conserva la regla anterior: disponible / atencion / critico', async () => {
++  await limpiar(101);
++  for (const [p, esperado] of [[10, 'disponible'], [50, 'atencion'], [79, 'atencion'], [80, 'critico'], [100, 'critico']]) {
++    const j = await (await post({ id_contenedor: 101, porcentaje_llenado: p })).json();
++    assert.equal(j.contenedor.estado_operativo, esperado, `${p}%`);
++  }
++});
++
++test('sin_reporte: sin lectura reciente se marca; con lectura nueva deja de marcarse', async () => {
++  await pool.query("UPDATE contenedor SET fecha_ultima_lectura=(NOW() AT TIME ZONE 'UTC') - INTERVAL '30 hours' WHERE id_contenedor=101");
++  let lista = await (await fetch(`${base}/api/contenedores`)).json();
++  assert.equal(lista.find((c) => c.id_contenedor === 101).sin_reporte, true);
++  await post({ id_contenedor: 101, porcentaje_llenado: 30 });
++  lista = await (await fetch(`${base}/api/contenedores`)).json();
++  assert.equal(lista.find((c) => c.id_contenedor === 101).sin_reporte, false);
++});
++
++test('un contenedor que nunca reportó (fecha NULL) aparece como sin_reporte', async () => {
++  await limpiar(105);
++  const c = (await (await fetch(`${base}/api/contenedores`)).json()).find((x) => x.id_contenedor === 105);
++  assert.equal(c.fecha_ultima_lectura, null);
++  assert.equal(c.sin_reporte, true);
++});
++
++test('la hora de la lectura se guarda y se lee en UTC (sin corrimiento)', async () => {
++  const antes = Date.now();
++  const j = await (await post({ id_contenedor: 101, porcentaje_llenado: 20 })).json();
++  const t = new Date(j.contenedor.fecha_ultima_lectura).getTime();
++  assert.ok(Math.abs(t - antes) < 10_000, `diferencia ${t - antes} ms`);
++  const fechaCliente = '2026-03-01T12:00:00Z';
++  await limpiar(101);
++  const k = await (await post({ id_contenedor: 101, porcentaje_llenado: 20, fecha_lectura: fechaCliente })).json();
++  assert.equal(k.contenedor.fecha_ultima_lectura, '2026-03-01T12:00:00.000Z');
++});
++
++// ---------------- Regla de alerta ----------------
++test('alerta exactamente en 80 %, sin duplicados mientras siga sobre el umbral', async () => {
++  await limpiar(102);
++  const a = await (await post({ id_contenedor: 102, porcentaje_llenado: 80 })).json();
++  assert.equal(a.alerta_creada, true);
++  for (const p of [85, 90, 100, 80]) {
++    const j = await (await post({ id_contenedor: 102, porcentaje_llenado: p })).json();
++    assert.equal(j.alerta_creada, false, `no debe duplicar en ${p}%`);
++  }
++  assert.equal(await pendientes(102), 1);
++  const fila = (await pool.query("SELECT porcentaje_disparo FROM alerta_llenado WHERE id_contenedor=102")).rows[0];
++  assert.equal(Number(fila.porcentaje_disparo), 80);
++});
++
++test('lecturas simultáneas sobre el umbral crean una sola alerta', async () => {
++  await limpiar(103);
++  const rs = await Promise.all(Array.from({ length: 12 }, (_, i) => post({ id_contenedor: 103, porcentaje_llenado: 85 + (i % 5) })));
++  assert.ok(rs.every((r) => r.status === 201 || r.status === 200));
++  assert.equal(await pendientes(103), 1);
++});
++
++test('al bajar de 80 % se resuelve y un nuevo cruce genera otra alerta', async () => {
++  await limpiar(104);
++  await post({ id_contenedor: 104, porcentaje_llenado: 90 });
++  const baja = await (await post({ id_contenedor: 104, porcentaje_llenado: 20 })).json();
++  assert.equal(baja.alerta_resuelta, true);
++  assert.equal(await pendientes(104), 0);
++  const sube = await (await post({ id_contenedor: 104, porcentaje_llenado: 82 })).json();
++  assert.equal(sube.alerta_creada, true);
++  const total = (await pool.query('SELECT count(*)::int n FROM alerta_llenado WHERE id_contenedor=104')).rows[0].n;
++  assert.equal(total, 2);
++  const res = (await pool.query("SELECT fecha_resolucion FROM alerta_llenado WHERE id_contenedor=104 AND estado_alerta='resuelta'")).rows[0];
++  assert.ok(res.fecha_resolucion instanceof Date);
++});
++
++test('una lectura más antigua que la guardada se ignora', async () => {
++  await limpiar(105);
++  await post({ id_contenedor: 105, porcentaje_llenado: 40 });
++  const vieja = new Date(Date.now() - 3_600_000).toISOString();
++  const r = await post({ id_contenedor: 105, porcentaje_llenado: 95, fecha_lectura: vieja });
++  assert.equal((await r.json()).recibida, false);
++  const c = (await (await fetch(`${base}/api/contenedores`)).json()).find((x) => x.id_contenedor === 105);
++  assert.equal(c.porcentaje_llenado, 40);
++  assert.equal(await pendientes(105), 0);
++});
++
++// ---------------- Consultas del panel ----------------
++test('GET /api/alertas/pendientes (ruta existente) y /api/alertas?estado= devuelven las alertas', async () => {
++  await limpiar(102);
++  await post({ id_contenedor: 102, porcentaje_llenado: 91 });
++  const pend = await (await fetch(`${base}/api/alertas/pendientes`)).json();
++  const a = pend.find((x) => x.id_contenedor === 102);
++  assert.equal(a.estado_alerta, 'pendiente');
++  assert.equal(a.porcentaje_llenado, 91);
++  const todas = await (await fetch(`${base}/api/alertas`)).json();
++  assert.ok(todas.length >= pend.length);
++  const resueltas = await (await fetch(`${base}/api/alertas?estado=resuelta`)).json();
++  assert.ok(resueltas.every((x) => x.estado_alerta === 'resuelta'));
++});
++
++test('GET /api/config expone umbral y horas de sin reporte', async () => {
++  assert.deepEqual(await (await fetch(`${base}/api/config`)).json(), { umbral_alerta: 80, sin_reporte_horas: 6 });
++});
++
++// ---------------- Ruta antigua PUT /api/contenedores/:id/nivel ----------------
++test('PUT antiguo: exige credencial, valida y usa la misma regla sin duplicados', async () => {
++  await limpiar(101);
++  assert.equal((await put(101, { porcentaje_llenado: 90 }, null)).status, 401);
++  assert.equal((await put('abc', { porcentaje_llenado: 90 })).status, 422);
++  assert.equal((await put(101, { porcentaje_llenado: 500 })).status, 422);
++  assert.equal((await put(99999, { porcentaje_llenado: 50 })).status, 404);
++  const r = await put(101, { porcentaje_llenado: 90 });
++  assert.equal(r.status, 200);
++  const j = await r.json();
++  assert.equal(j.mensaje, 'Lectura actualizada');
++  assert.equal(j.alerta_creada, true);
++  for (let i = 0; i < 4; i++) await put(101, { porcentaje_llenado: 91 + i });
++  assert.equal(await pendientes(101), 1, 'el código anterior creaba una alerta por cada lectura');
++});
++
++// ---------------- Tiempo real ----------------
++test('SSE: el panel recibe el evento al llegar una lectura', async () => {
++  const ctrl = new AbortController();
++  const res = await fetch(`${base}/api/stream`, { signal: ctrl.signal });
++  assert.match(res.headers.get('content-type'), /text\/event-stream/);
++  const reader = res.body.getReader();
++  await reader.read(); // "retry: 3000"
++  await post({ id_contenedor: 101, porcentaje_llenado: 33 });
++  const { value } = await reader.read();
++  const txt = new TextDecoder().decode(value);
++  ctrl.abort();
++  assert.match(txt, /event: lectura/);
++  assert.match(txt, /"id_contenedor":101/);
++});
++
++test('SSE: una lectura rechazada NO emite evento', async () => {
++  const ctrl = new AbortController();
++  const res = await fetch(`${base}/api/stream`, { signal: ctrl.signal });
++  const reader = res.body.getReader();
++  await reader.read();
++  await post({ id_contenedor: 101, porcentaje_llenado: 150 }); // 422
++  await post({ id_contenedor: 101, porcentaje_llenado: 44 }, null); // 401
++  await post({ id_contenedor: 101, porcentaje_llenado: 45 }); // válida
++  const { value } = await reader.read();
++  ctrl.abort();
++  const txt = new TextDecoder().decode(value);
++  assert.match(txt, /"porcentaje_llenado":45/);
++  assert.doesNotMatch(txt, /"porcentaje_llenado":150|"porcentaje_llenado":44/);
++});
+diff --git a/ecosmart-backend/test/migracion.test.js b/ecosmart-backend/test/migracion.test.js
+new file mode 100644
+index 0000000..21c9c1c
+--- /dev/null
++++ b/ecosmart-backend/test/migracion.test.js
+@@ -0,0 +1,57 @@
++const { test, after } = require('node:test');
++const assert = require('node:assert/strict');
++const fs = require('node:fs');
++const path = require('node:path');
++const pool = require('../src/config/db');
++
++const MIGRACION = fs.readFileSync(path.join(__dirname, '..', 'sql', '01_migracion_lecturas.sql'), 'utf8');
++after(() => pool.end());
++
++const ids = async () => (await pool.query("SELECT id_alerta, estado_alerta FROM alerta_llenado WHERE id_contenedor=105 ORDER BY id_alerta")).rows;
++
++test('la migración es idempotente (se puede correr varias veces)', async () => {
++  await pool.query(MIGRACION);
++  await pool.query(MIGRACION);
++});
++
++test('limpia los duplicados que dejaba el código anterior y deja una sola alerta pendiente', async () => {
++  // Reproduce el estado de la BD real: sin índice único y con una alerta 'pendiente' por cada lectura >= 80 %.
++  await pool.query('DELETE FROM alerta_llenado WHERE id_contenedor=105');
++  await pool.query('DROP INDEX uq_alerta_pendiente_por_contenedor');
++  for (const id of [900, 901, 902]) {
++    await pool.query(
++      "INSERT INTO alerta_llenado (id_alerta, id_contenedor, fecha_generacion, estado_alerta) VALUES ($1, 105, (NOW() AT TIME ZONE 'UTC'), 'pendiente')",
++      [id]
++    );
++  }
++  await pool.query("INSERT INTO alerta_llenado (id_alerta, id_contenedor, fecha_generacion, estado_alerta) VALUES (903, 105, (NOW() AT TIME ZONE 'UTC'), 'resuelta')");
++
++  await pool.query(MIGRACION);
++
++  assert.deepEqual(await ids(), [
++    { id_alerta: 900, estado_alerta: 'pendiente' }, // se conserva la más antigua
++    { id_alerta: 901, estado_alerta: 'duplicada' },
++    { id_alerta: 902, estado_alerta: 'duplicada' },
++    { id_alerta: 903, estado_alerta: 'resuelta' }, // lo ya resuelto no se toca
++  ]);
++  // Nada se borró, y ahora la base impide un segundo 'pendiente'.
++  await assert.rejects(
++    pool.query("INSERT INTO alerta_llenado (id_contenedor, fecha_generacion, estado_alerta) VALUES (105, (NOW() AT TIME ZONE 'UTC'), 'pendiente')"),
++    /uq_alerta_pendiente_por_contenedor/
++  );
++  await pool.query('DELETE FROM alerta_llenado WHERE id_contenedor=105');
++});
++
++test('si id_alerta no era autogenerado, el contador parte después del id más alto existente', async () => {
++  await pool.query('DELETE FROM alerta_llenado');
++  await pool.query('ALTER TABLE alerta_llenado ALTER COLUMN id_alerta DROP IDENTITY');
++  await pool.query("INSERT INTO alerta_llenado (id_alerta, id_contenedor, fecha_generacion, estado_alerta) VALUES (500, 102, (NOW() AT TIME ZONE 'UTC'), 'resuelta')");
++
++  await pool.query(MIGRACION);
++
++  const { rows } = await pool.query(
++    "INSERT INTO alerta_llenado (id_contenedor, fecha_generacion, estado_alerta) VALUES (102, (NOW() AT TIME ZONE 'UTC'), 'resuelta') RETURNING id_alerta"
++  );
++  assert.equal(rows[0].id_alerta, 501);
++  await pool.query('DELETE FROM alerta_llenado');
++});
+diff --git a/ecosmart-backend/test/ratelimit.test.js b/ecosmart-backend/test/ratelimit.test.js
+new file mode 100644
+index 0000000..a5c8294
+--- /dev/null
++++ b/ecosmart-backend/test/ratelimit.test.js
+@@ -0,0 +1,27 @@
++// Corre en su propio proceso: el límite se fija ANTES de cargar la app.
++process.env.RATE_LIMIT_POR_MINUTO = '5';
++
++const { test, before, after } = require('node:test');
++const assert = require('node:assert/strict');
++const app = require('../index');
++const pool = require('../src/config/db');
++
++let server, base;
++before(async () => {
++  await new Promise((r) => { server = app.listen(0, r); });
++  base = `http://localhost:${server.address().port}`;
++});
++after(async () => { server.close(); await pool.end(); });
++
++test('supera el límite por minuto → 429', async () => {
++  const estados = [];
++  for (let i = 0; i < 8; i++) {
++    const r = await fetch(`${base}/api/lecturas`, {
++      method: 'POST',
++      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer clave-incorrecta-123456' },
++      body: JSON.stringify({ id_contenedor: 101, porcentaje_llenado: 10 }),
++    });
++    estados.push(r.status);
++  }
++  assert.deepEqual(estados, [401, 401, 401, 401, 401, 429, 429, 429]);
++});
+diff --git a/ecosmart-mobile/.env.example b/ecosmart-mobile/.env.example
+new file mode 100644
+index 0000000..3f98827
+--- /dev/null
++++ b/ecosmart-mobile/.env.example
+@@ -0,0 +1,2 @@
++# URL del backend (ecosmart-backend). En producción, la URL pública del servidor.
++VITE_API_URL=http://localhost:5000
+diff --git a/ecosmart-mobile/README.md b/ecosmart-mobile/README.md
+index b1188b5..2cc0485 100644
+--- a/ecosmart-mobile/README.md
++++ b/ecosmart-mobile/README.md
+@@ -15,6 +15,16 @@ npm run dev
+ 
+ Luego abre `http://localhost:5174` (puerto fijo distinto al de EcoSmart, para poder correr ambas apps a la vez).
+ 
++## Conexión con el backend
++
++El **Panel de Control Operativo** (perfil Administrador) muestra datos reales del backend y se actualiza solo cuando llega una lectura nueva (último % de llenado, señal "Sin reporte" y alertas ≥ 80 %).
++
++```bash
++cp .env.example .env     # VITE_API_URL=http://localhost:5000 (URL del ecosmart-backend)
++```
++
++Levanta primero el backend (ver `ecosmart-backend/README.md`). Si no responde, el panel muestra el error y un botón para reintentar.
++
+ ## Build de producción
+ 
+ ```bash
+diff --git a/ecosmart-mobile/src/hooks/useContenedoresEnVivo.js b/ecosmart-mobile/src/hooks/useContenedoresEnVivo.js
+new file mode 100644
+index 0000000..48ba413
+--- /dev/null
++++ b/ecosmart-mobile/src/hooks/useContenedoresEnVivo.js
+@@ -0,0 +1,116 @@
++import { useCallback, useEffect, useRef, useState } from "react";
++import { abrirStream, getAlertas, getConfig, getContenedores } from "../services/api.js";
++
++const CONFIG_POR_DEFECTO = { umbral_alerta: 80, sin_reporte_horas: 6 };
++
++/** Señal "contenedor sin reporte": nunca reportó, o pasó más del límite sin lectura. */
++export function estaSinReporte(c, ahora, horas) {
++  if (!c.fecha_ultima_lectura) return true;
++  return ahora - new Date(c.fecha_ultima_lectura).getTime() > horas * 3_600_000;
++}
++
++/** "hace 5 min", "hace 2 h"... */
++export function hace(iso, ahora) {
++  if (!iso) return "Nunca reportó";
++  const s = Math.max(0, (ahora - new Date(iso).getTime()) / 1000);
++  if (s < 60) return "hace instantes";
++  if (s < 3600) return `hace ${Math.floor(s / 60)} min`;
++  if (s < 86400) return `hace ${Math.floor(s / 3600)} h`;
++  return `hace ${Math.floor(s / 86400)} d`;
++}
++
++// Si llegan datos repetidos (carga completa vs evento en vivo), se queda con la lectura más nueva.
++const tiempo = (c) => (c?.fecha_ultima_lectura ? new Date(c.fecha_ultima_lectura).getTime() : 0);
++const elMasReciente = (actual, entrante) => (actual && tiempo(actual) > tiempo(entrante) ? actual : entrante);
++
++/**
++ * Contenedores con su última lectura, actualizados solos cuando llega una lectura nueva.
++ * conexion: "cargando" | "en_vivo" | "reconectando"
++ */
++export default function useContenedoresEnVivo() {
++  const [porId, setPorId] = useState({});
++  const [alertas, setAlertas] = useState([]);
++  const [config, setConfig] = useState(CONFIG_POR_DEFECTO);
++  const [conexion, setConexion] = useState("cargando");
++  const [cargado, setCargado] = useState(false);
++  const [error, setError] = useState(null);
++  const [actualizados, setActualizados] = useState({});
++  const [ahora, setAhora] = useState(() => Date.now());
++  const montado = useRef(true);
++  const aperturas = useRef(0);
++
++  const cargar = useCallback(async () => {
++    try {
++      const [cfg, lista, alr] = await Promise.all([
++        getConfig().catch(() => null), // sin config se usan los valores por defecto
++        getContenedores(),
++        getAlertas(),
++      ]);
++      if (!montado.current) return;
++      if (cfg) setConfig(cfg);
++      setPorId((prev) => {
++        const sig = {};
++        for (const c of lista) sig[c.id_contenedor] = elMasReciente(prev[c.id_contenedor], c);
++        return sig;
++      });
++      setAlertas(alr);
++      setCargado(true);
++      setError(null);
++    } catch (e) {
++      if (montado.current) setError(e.message || "Error de red");
++    }
++  }, []);
++
++  const marcar = useCallback((id) => {
++    setActualizados((p) => ({ ...p, [id]: true }));
++    setTimeout(() => {
++      if (!montado.current) return;
++      setActualizados((p) => {
++        const { [id]: _quitado, ...resto } = p;
++        return resto;
++      });
++    }, 1800);
++  }, []);
++
++  // Carga inicial + reloj para que "hace X min" y "Sin reporte" avancen solos.
++  useEffect(() => {
++    montado.current = true;
++    cargar();
++    const reloj = setInterval(() => setAhora(Date.now()), 30_000);
++    return () => {
++      montado.current = false;
++      clearInterval(reloj);
++    };
++  }, [cargar]);
++
++  // Conexión en vivo.
++  useEffect(() => {
++    return abrirStream({
++      onEstado: (estado) => {
++        if (!montado.current) return;
++        setConexion(estado);
++        if (estado === "en_vivo") {
++          aperturas.current += 1;
++          // Al RECONECTAR se vuelve a cargar todo para recuperar lo que llegó mientras estuvo caída.
++          if (aperturas.current > 1) cargar();
++        }
++      },
++      onLectura: ({ contenedor, alerta_creada, alerta_resuelta }) => {
++        if (!montado.current) return;
++        setPorId((prev) => ({
++          ...prev,
++          [contenedor.id_contenedor]: elMasReciente(prev[contenedor.id_contenedor], contenedor),
++        }));
++        marcar(contenedor.id_contenedor);
++        if (alerta_creada || alerta_resuelta) {
++          getAlertas()
++            .then((a) => montado.current && setAlertas(a))
++            .catch(() => {});
++        }
++      },
++    });
++  }, [cargar, marcar]);
++
++  const contenedores = Object.values(porId).sort((a, b) => a.id_contenedor - b.id_contenedor);
++  return { contenedores, alertas, config, conexion, cargado, error, actualizados, ahora, recargar: cargar };
++}
+diff --git a/ecosmart-mobile/src/screens/AdminPanelScreen.jsx b/ecosmart-mobile/src/screens/AdminPanelScreen.jsx
+index 2ddf00e..c3c2f0f 100644
+--- a/ecosmart-mobile/src/screens/AdminPanelScreen.jsx
++++ b/ecosmart-mobile/src/screens/AdminPanelScreen.jsx
+@@ -1,137 +1,200 @@
+ import React from "react";
+-import { LayoutDashboard, AlertTriangle, Boxes, Gauge, MapPin } from "lucide-react";
+-import { MAP_PINS, STATUS_META, getFillStatus, getActiveAlerts } from "../data/mockData.js";
++import { LayoutDashboard, AlertTriangle, Boxes, Gauge, MapPin, WifiOff, RefreshCw } from "lucide-react";
++import { STATUS_META, FILL_THRESHOLDS } from "../data/mockData.js";
++import useContenedoresEnVivo, { estaSinReporte, hace } from "../hooks/useContenedoresEnVivo.js";
++import { apiUrl } from "../services/api.js";
+ 
+ /**
+  * AdminPanelScreen — Panel de Control Operativo (Innova Recicla)
+  * RF-01 Monitoreo en Tiempo Real + RF-02 Alertas Preventivas de Llenado.
++ *
++ * Datos reales del backend (/api/contenedores, /api/alertas) y actualización automática por
++ * Server-Sent Events: cuando llega una lectura nueva, la fila se actualiza sola.
+  */
+ export default function AdminPanelScreen({ darkMode = true }) {
+-  const alerts = getActiveAlerts(); // contenedores >= 80% (RF-02)
+-  const avgFill = Math.round(
+-    MAP_PINS.reduce((sum, p) => sum + p.fill, 0) / MAP_PINS.length
+-  );
++  const { contenedores, alertas, config, conexion, cargado, error, actualizados, ahora, recargar } =
++    useContenedoresEnVivo();
++  const umbral = config.umbral_alerta;
++
++  // Estado de color según el % (el umbral de "Lleno" es el mismo de la alerta).
++  const estadoDe = (pct) => (pct >= umbral ? "full" : pct >= FILL_THRESHOLDS.MEDIUM ? "medium" : "low");
++  const sinLectura = (c) => !c.fecha_ultima_lectura;
++  const sinReporte = (c) => estaSinReporte(c, ahora, config.sin_reporte_horas);
++
++  // En alerta: alerta pendiente registrada, o último valor ya sobre el umbral.
++  const enAlerta = contenedores.filter((c) => c.alerta_activa || (!sinLectura(c) && c.porcentaje_llenado >= umbral));
++  const cantSinReporte = contenedores.filter(sinReporte).length;
++  const conLectura = contenedores.filter((c) => !sinLectura(c));
++  const avgFill = conLectura.length
++    ? Math.round(conLectura.reduce((s, c) => s + c.porcentaje_llenado, 0) / conLectura.length)
++    : null;
++  const alertaDe = (id) => alertas.find((a) => a.id_contenedor === id && a.estado_alerta === "pendiente");
++
++  const card = darkMode ? "border-zinc-800 bg-zinc-900/60" : "border-stone-200 bg-white";
++  const tenue = darkMode ? "text-zinc-500" : "text-stone-400";
+ 
+   return (
+     <div className={`flex-1 flex flex-col gap-4 pb-24 transition-colors ${darkMode ? "text-white" : "text-zinc-900"}`}>
+       <div className="flex items-center gap-2 pb-2 border-b border-zinc-700/40 mt-1">
+         <LayoutDashboard className="w-5 h-5 text-emerald-500" />
+         <h2 className="font-bold text-base">Panel de Control Operativo</h2>
++        <EstadoConexion conexion={conexion} cargado={cargado} tenue={tenue} />
+       </div>
+ 
+-      {/* Tarjetas resumen (RF-01) */}
+-      <div className="grid grid-cols-3 gap-2">
+-        <SummaryCard
+-          darkMode={darkMode}
+-          icon={Boxes}
+-          value={MAP_PINS.length}
+-          label="Contenedores"
+-          color="text-emerald-500"
+-        />
+-        <SummaryCard
+-          darkMode={darkMode}
+-          icon={AlertTriangle}
+-          value={alerts.length}
+-          label="En alerta"
+-          color="text-red-500"
+-        />
+-        <SummaryCard
+-          darkMode={darkMode}
+-          icon={Gauge}
+-          value={`${avgFill}%`}
+-          label="Llenado prom."
+-          color="text-amber-500"
+-        />
+-      </div>
+-
+-      {/* RF-02: Alertas preventivas (>= 80% de capacidad) */}
+-      <div>
+-        <h3 className="text-xs font-bold uppercase tracking-wider text-red-500 mb-2 flex items-center gap-1.5">
+-          <AlertTriangle className="w-3.5 h-3.5" />
+-          Alertas activas (≥ 80%)
+-        </h3>
++      {/* Sin datos todavía: cargando o servidor inalcanzable */}
++      {!cargado && !error && (
++        <div className={`text-xs rounded-xl p-3 border ${card} ${tenue}`}>Cargando contenedores…</div>
++      )}
++      {!cargado && error && (
++        <div className="rounded-xl p-3 border border-red-500/40 bg-red-500/10 text-xs flex items-start gap-2">
++          <WifiOff className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
++          <div className="flex-1 min-w-0">
++            <p className="font-bold">No se pudo conectar con el servidor</p>
++            <p className={`mt-0.5 break-words ${tenue}`}>{apiUrl} · {error}</p>
++            <button
++              onClick={recargar}
++              className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-zinc-700 text-white px-3 py-1.5 font-bold"
++            >
++              <RefreshCw className="w-3 h-3" />
++              Reintentar
++            </button>
++          </div>
++        </div>
++      )}
+ 
+-        {alerts.length === 0 ? (
+-          <div
+-            className={`text-xs rounded-xl p-3 border ${
+-              darkMode ? "border-zinc-800 bg-zinc-900/60 text-zinc-400" : "border-stone-200 bg-white text-stone-500"
+-            }`}
+-          >
+-            Sin alertas activas. Todos los contenedores están bajo el 80% de capacidad.
++      {cargado && (
++        <>
++          {/* Tarjetas resumen (RF-01) */}
++          <div className="grid grid-cols-4 gap-2">
++            <SummaryCard darkMode={darkMode} icon={Boxes} value={contenedores.length} label="Contenedores" color="text-emerald-500" />
++            <SummaryCard darkMode={darkMode} icon={AlertTriangle} value={enAlerta.length} label="En alerta" color="text-red-500" />
++            <SummaryCard darkMode={darkMode} icon={WifiOff} value={cantSinReporte} label="Sin reporte" color="text-amber-500" />
++            <SummaryCard darkMode={darkMode} icon={Gauge} value={avgFill === null ? "—" : `${avgFill}%`} label="Llenado prom." color="text-sky-500" />
+           </div>
+-        ) : (
+-          <div className="space-y-2">
+-            {alerts.map((pin) => (
+-              <div
+-                key={pin.id}
+-                className="rounded-xl p-3 border border-red-500/40 bg-red-500/10 flex items-center justify-between gap-3"
+-              >
+-                <div className="min-w-0">
+-                  <p className="text-xs font-bold truncate">{pin.name}</p>
+-                  <p className="text-[11px] text-zinc-400 flex items-center gap-1 mt-0.5">
+-                    <MapPin className="w-3 h-3 shrink-0" />
+-                    {pin.address}
+-                  </p>
+-                </div>
+-                <span className="shrink-0 text-red-500 font-black text-lg">{pin.fill}%</span>
++
++          {/* RF-02: Alertas preventivas (>= umbral de capacidad) */}
++          <div>
++            <h3 className="text-xs font-bold uppercase tracking-wider text-red-500 mb-2 flex items-center gap-1.5">
++              <AlertTriangle className="w-3.5 h-3.5" />
++              Alertas activas (≥ {umbral}%)
++            </h3>
++
++            {enAlerta.length === 0 ? (
++              <div className={`text-xs rounded-xl p-3 border ${darkMode ? "text-zinc-400" : "text-stone-500"} ${card}`}>
++                Sin alertas activas. Todos los contenedores están bajo el {umbral}% de capacidad.
+               </div>
+-            ))}
++            ) : (
++              <div className="space-y-2">
++                {enAlerta.map((c) => {
++                  const a = alertaDe(c.id_contenedor);
++                  return (
++                    <div
++                      key={c.id_contenedor}
++                      className="rounded-xl p-3 border border-red-500/40 bg-red-500/10 flex items-center justify-between gap-3"
++                    >
++                      <div className="min-w-0">
++                        <p className="text-xs font-bold truncate">Contenedor #{c.id_contenedor}</p>
++                        <p className="text-[11px] text-zinc-400 truncate">
++                          {c.nombre_material ?? "Sin material"}
++                          {a?.fecha_generacion ? ` · alerta ${hace(a.fecha_generacion, ahora)}` : ""}
++                        </p>
++                        <p className="text-[11px] text-zinc-400 flex items-center gap-1 mt-0.5">
++                          <MapPin className="w-3 h-3 shrink-0" />
++                          {c.latitud?.toFixed(4)}, {c.longitud?.toFixed(4)}
++                        </p>
++                      </div>
++                      <span className="shrink-0 text-red-500 font-black text-lg">{Math.round(c.porcentaje_llenado)}%</span>
++                    </div>
++                  );
++                })}
++              </div>
++            )}
+           </div>
+-        )}
+-      </div>
+ 
+-      {/* RF-01: Monitoreo en tiempo real de todos los contenedores del piloto */}
+-      <div>
+-        <h3 className={`text-xs font-bold uppercase tracking-wider mb-2 ${darkMode ? "text-zinc-400" : "text-stone-500"}`}>
+-          Todos los contenedores
+-        </h3>
+-        <div className="space-y-2">
+-          {MAP_PINS.map((pin) => {
+-            const meta = STATUS_META[getFillStatus(pin.fill)];
+-            return (
+-              <div
+-                key={pin.id}
+-                className={`rounded-xl p-3 border flex items-center gap-3 ${
+-                  darkMode ? "border-zinc-800 bg-zinc-900/60" : "border-stone-200 bg-white"
+-                }`}
+-              >
+-                <span
+-                  className="w-2.5 h-2.5 rounded-full shrink-0"
+-                  style={{ backgroundColor: meta.color }}
+-                />
+-                <div className="min-w-0 flex-1">
+-                  <p className="text-xs font-semibold truncate">{pin.name}</p>
+-                  <p className={`text-[11px] truncate ${darkMode ? "text-zinc-500" : "text-stone-400"}`}>
+-                    {pin.category} · {pin.address}
+-                  </p>
+-                </div>
+-                <div className="text-right shrink-0">
+-                  <p className="text-xs font-bold" style={{ color: meta.color }}>
+-                    {pin.fill}%
+-                  </p>
+-                  <p className="text-[10px]" style={{ color: meta.color }}>
+-                    {meta.label}
+-                  </p>
+-                </div>
++          {/* RF-01: Monitoreo en tiempo real de todos los contenedores del piloto */}
++          <div>
++            <h3 className={`text-xs font-bold uppercase tracking-wider mb-2 ${darkMode ? "text-zinc-400" : "text-stone-500"}`}>
++              Todos los contenedores
++            </h3>
++            {contenedores.length === 0 ? (
++              <div className={`text-xs rounded-xl p-3 border ${card} ${tenue}`}>Todavía no hay contenedores registrados.</div>
++            ) : (
++              <div className="space-y-2">
++                {contenedores.map((c) => {
++                  const nunca = sinLectura(c);
++                  const stale = sinReporte(c);
++                  const meta = nunca ? { color: "#71717a", label: "Sin lectura" } : STATUS_META[estadoDe(c.porcentaje_llenado)];
++                  return (
++                    <div
++                      key={c.id_contenedor}
++                      className={`rounded-xl p-3 border flex items-center gap-3 transition-shadow duration-500 ${card} ${
++                        actualizados[c.id_contenedor] ? "ring-2 ring-emerald-500/60" : ""
++                      }`}
++                    >
++                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: meta.color }} />
++                      <div className="min-w-0 flex-1">
++                        <div className="flex items-center gap-1.5">
++                          <p className="text-xs font-semibold truncate">Contenedor #{c.id_contenedor}</p>
++                          {stale && (
++                            <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-amber-500/15 text-amber-500 px-1.5 py-0.5 text-[10px] font-bold">
++                              <WifiOff className="w-2.5 h-2.5" />
++                              Sin reporte
++                            </span>
++                          )}
++                        </div>
++                        <p className={`text-[11px] truncate ${stale && !nunca ? "text-amber-500" : tenue}`}>
++                          {c.nombre_material ?? "Sin material"} · {hace(c.fecha_ultima_lectura, ahora)}
++                        </p>
++                        {!nunca && (
++                          <div className={`h-1 rounded-full mt-1.5 overflow-hidden ${darkMode ? "bg-zinc-800" : "bg-stone-200"}`}>
++                            <div
++                              className="h-full rounded-full transition-all duration-500"
++                              style={{ width: `${Math.min(100, c.porcentaje_llenado)}%`, backgroundColor: meta.color }}
++                            />
++                          </div>
++                        )}
++                      </div>
++                      <div className="text-right shrink-0">
++                        <p className="text-xs font-bold" style={{ color: meta.color }}>
++                          {nunca ? "—" : `${Math.round(c.porcentaje_llenado)}%`}
++                        </p>
++                        <p className="text-[10px]" style={{ color: meta.color }}>
++                          {meta.label}
++                        </p>
++                      </div>
++                    </div>
++                  );
++                })}
+               </div>
+-            );
+-          })}
+-        </div>
+-      </div>
++            )}
++          </div>
++        </>
++      )}
+     </div>
+   );
+ }
+ 
++function EstadoConexion({ conexion, cargado, tenue }) {
++  if (!cargado) return null;
++  const enVivo = conexion === "en_vivo";
++  return (
++    <span className={`ml-auto inline-flex items-center gap-1.5 text-[11px] ${enVivo ? "text-emerald-500" : "text-amber-500"}`}>
++      <span className={`w-2 h-2 rounded-full ${enVivo ? "bg-emerald-500" : "bg-amber-500"}`} />
++      <span className={enVivo ? "" : tenue}>{enVivo ? "En vivo" : "Reconectando…"}</span>
++    </span>
++  );
++}
++
+ function SummaryCard({ darkMode, icon: Icon, value, label, color }) {
+   return (
+     <div
+-      className={`rounded-xl p-3 border flex flex-col items-center text-center gap-1 ${
++      className={`rounded-xl p-2.5 border flex flex-col items-center text-center gap-1 ${
+         darkMode ? "border-zinc-800 bg-zinc-900/60" : "border-stone-200 bg-white"
+       }`}
+     >
+       <Icon className={`w-4 h-4 ${color}`} />
+       <p className="text-lg font-black leading-none">{value}</p>
+-      <p className={`text-[10px] ${darkMode ? "text-zinc-500" : "text-stone-400"}`}>{label}</p>
++      <p className={`text-[10px] leading-tight ${darkMode ? "text-zinc-500" : "text-stone-400"}`}>{label}</p>
+     </div>
+   );
+ }
+diff --git a/ecosmart-mobile/src/services/api.js b/ecosmart-mobile/src/services/api.js
+new file mode 100644
+index 0000000..ccbfa2d
+--- /dev/null
++++ b/ecosmart-mobile/src/services/api.js
+@@ -0,0 +1,34 @@
++// Conexión con el backend de EcoSmart (ecosmart-backend).
++// Define VITE_API_URL en ecosmart-mobile/.env (ver .env.example). Por defecto apunta al backend local.
++const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
++
++async function getJSON(ruta) {
++  const res = await fetch(`${API_URL}${ruta}`);
++  if (!res.ok) throw new Error(`El servidor respondió ${res.status}`);
++  return res.json();
++}
++
++export const apiUrl = API_URL;
++export const getConfig = () => getJSON("/api/config");
++export const getContenedores = () => getJSON("/api/contenedores");
++export const getAlertas = () => getJSON("/api/alertas");
++
++/**
++ * Abre la conexión en vivo (Server-Sent Events). El navegador reconecta solo si se corta.
++ * - onEstado("en_vivo" | "reconectando")
++ * - onLectura({ contenedor, alerta_creada, alerta_resuelta })
++ * Devuelve una función para cerrarla.
++ */
++export function abrirStream({ onEstado, onLectura }) {
++  const es = new EventSource(`${API_URL}/api/stream`);
++  es.onopen = () => onEstado("en_vivo");
++  es.onerror = () => onEstado("reconectando");
++  es.addEventListener("lectura", (ev) => {
++    try {
++      onLectura(JSON.parse(ev.data));
++    } catch {
++      /* evento mal formado: se ignora */
++    }
++  });
++  return () => es.close();
++}

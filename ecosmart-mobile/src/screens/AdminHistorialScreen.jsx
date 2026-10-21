@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { History, Truck, AlertTriangle, QrCode } from "lucide-react";
-import { PICKUP_HISTORY, anomalyReports, depositHistory, ANOMALY_TYPES } from "../data/mockData.js";
+import { PICKUP_HISTORY, depositHistory, ANOMALY_TYPES } from "../data/mockData.js";
+import { getReportes } from "../services/api.js";
 
 /**
  * AdminHistorialScreen — Módulo Histórico y Trazabilidad (RF-03).
@@ -10,7 +11,16 @@ import { PICKUP_HISTORY, anomalyReports, depositHistory, ANOMALY_TYPES } from ".
  */
 export default function AdminHistorialScreen({ darkMode = true }) {
   const pickups = [...PICKUP_HISTORY].sort((a, b) => (a.date < b.date ? 1 : -1));
-  const pendingReports = [...anomalyReports].reverse();
+  // Reportes ciudadanos pendientes, desde el backend (ya vienen del más nuevo al más antiguo).
+  const [pendingReports, setPendingReports] = useState([]);
+  const [reportsError, setReportsError] = useState(null);
+  useEffect(() => {
+    let vivo = true;
+    getReportes("pendiente")
+      .then((r) => vivo && setPendingReports(r))
+      .catch((e) => vivo && setReportsError(e.message));
+    return () => { vivo = false; };
+  }, []);
 
   return (
     <div className={`flex-1 flex flex-col gap-4 pb-24 transition-colors ${darkMode ? "text-white" : "text-zinc-900"}`}>
@@ -59,27 +69,29 @@ export default function AdminHistorialScreen({ darkMode = true }) {
               darkMode ? "border-zinc-800 bg-zinc-900/60 text-zinc-400" : "border-stone-200 bg-white text-stone-500"
             }`}
           >
-            No hay reportes ciudadanos pendientes.
+            {reportsError ? `No se pudieron cargar los reportes (${reportsError}).` : "No hay reportes ciudadanos pendientes."}
           </div>
         ) : (
           <div className="space-y-2">
             {pendingReports.map((r) => {
-              const typeLabel = ANOMALY_TYPES.find((t) => t.id === r.typeId)?.label ?? r.typeId;
+              const typeLabel = ANOMALY_TYPES.find((t) => t.id === r.tipo_anomalia)?.label ?? r.tipo_anomalia;
               return (
                 <div
-                  key={r.id}
+                  key={r.id_reporte}
                   className="rounded-xl p-3 border border-red-500/40 bg-red-500/10"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-bold truncate">{r.stationName}</p>
+                    <p className="text-xs font-bold truncate">
+                      Contenedor #{r.id_contenedor}{r.nombre_material ? ` · ${r.nombre_material}` : ""}
+                    </p>
                     <span className="shrink-0 text-[10px] text-zinc-400">
-                      {new Date(r.createdAt).toLocaleDateString()}
+                      {new Date(r.fecha_reporte).toLocaleDateString()}
                     </span>
                   </div>
                   <p className="text-[11px] font-semibold text-red-500 mt-0.5">{typeLabel}</p>
-                  {r.description && (
+                  {r.descripcion && (
                     <p className={`text-[11px] mt-1 ${darkMode ? "text-zinc-400" : "text-stone-500"}`}>
-                      {r.description}
+                      {r.descripcion}
                     </p>
                   )}
                 </div>

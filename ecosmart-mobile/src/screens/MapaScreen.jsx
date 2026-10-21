@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker } from "react-leaflet";
 import L from "leaflet";
 import { X, Recycle, MapPin } from "lucide-react";
 import { MAP_PINS, STATUS_META, getFillStatus } from "../data/mockData.js";
+import useContenedoresEnVivo from "../hooks/useContenedoresEnVivo.js";
 import icon from "leaflet/dist/images/marker-icon.png";
 import iconShadow from "leaflet/dist/images/marker-shadow.png";
 
@@ -45,8 +46,24 @@ const createCustomPinIcon = (color, isDark) => {
   });
 };
 
+// Contenedor real del backend → pin del mapa. id_contenedor es lo que necesita el reporte ciudadano.
+const aPin = (c) => ({
+  id: `c-${c.id_contenedor}`,
+  id_contenedor: c.id_contenedor,
+  name: `Contenedor #${c.id_contenedor}`,
+  category: c.nombre_material || null,
+  lat: c.latitud,
+  lng: c.longitud,
+  fill: Math.round(c.porcentaje_llenado),
+  acceptedMaterials: c.nombre_material ? [c.nombre_material] : null,
+});
+
 export default function MapaScreen({ darkMode = true, onViewStation }) {
   const [selectedPin, setSelectedPin] = useState(null);
+  const { contenedores } = useContenedoresEnVivo();
+  const reales = contenedores.filter((c) => c.latitud != null && c.longitud != null).map(aPin);
+  // Sin backend (o sin contenedores con ubicación) se muestran los puntos de ejemplo.
+  const pins = reales.length ? reales : MAP_PINS;
 
   // URLs de mapa gratuitas (CartoDB) que se adaptan a modo claro / oscuro
   const tileLayerUrl = darkMode
@@ -77,7 +94,7 @@ export default function MapaScreen({ darkMode = true, onViewStation }) {
           />
 
           {/* Renderizado de Marcadores */}
-          {MAP_PINS?.map((pin) => {
+          {pins.map((pin) => {
             const meta = STATUS_META[getFillStatus(pin.fill)];
             const customIcon = createCustomPinIcon(meta.color, darkMode);
 

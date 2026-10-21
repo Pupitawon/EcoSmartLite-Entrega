@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { ChevronLeft, Recycle, QrCode, AlertTriangle, X, CheckCircle2 } from "lucide-react";
-import { STATUS_META, getFillStatus, ANOMALY_TYPES, submitAnomalyReport } from "../data/mockData.js";
+import { STATUS_META, getFillStatus, ANOMALY_TYPES } from "../data/mockData.js";
+import { enviarReporte } from "../services/auth.js";
 
 /**
  * EstacionScreen (image_4.png)
@@ -17,21 +18,30 @@ export default function EstacionScreen({ station, onBack, darkMode }) {
   const [typeId, setTypeId] = useState(ANOMALY_TYPES[0].id);
   const [description, setDescription] = useState("");
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState(null);
+  // Solo los contenedores reales del backend (no los puntos de ejemplo) se pueden reportar.
+  const reportable = Number.isInteger(station?.id_contenedor);
 
-  const handleSubmitReport = (e) => {
+  const handleSubmitReport = async (e) => {
     e.preventDefault();
-    submitAnomalyReport({
-      stationId: station?.id,
-      stationName: name,
-      typeId,
-      description,
-    });
-    setSent(true);
+    if (!reportable || sending) return;
+    setSending(true);
+    setError(null);
+    try {
+      await enviarReporte({ id_contenedor: station.id_contenedor, tipo_anomalia: typeId, descripcion: description });
+      setSent(true);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSending(false);
+    }
   };
 
   const closeReport = () => {
     setReportOpen(false);
     setSent(false);
+    setError(null);
     setTypeId(ANOMALY_TYPES[0].id);
     setDescription("");
   };
@@ -161,6 +171,7 @@ export default function EstacionScreen({ station, onBack, darkMode }) {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Describe brevemente el problema (opcional)"
+                  maxLength={500}
                   rows={3}
                   className={`w-full p-2.5 text-xs rounded-xl border resize-none focus:outline-none focus:ring-2 focus:ring-amber-500 ${
                     darkMode
@@ -169,11 +180,19 @@ export default function EstacionScreen({ station, onBack, darkMode }) {
                   }`}
                 />
 
+                {!reportable && (
+                  <p className="text-[11px] text-amber-600">
+                    Este punto es de ejemplo y no está conectado a un contenedor real, así que no se puede reportar.
+                  </p>
+                )}
+                {error && <p className="text-[11px] text-red-500">{error}</p>}
+
                 <button
                   type="submit"
-                  className="w-full bg-amber-500 text-white text-xs font-bold py-2.5 rounded-xl hover:bg-amber-400 transition-all active:scale-[0.99]"
+                  disabled={!reportable || sending}
+                  className="w-full bg-amber-500 text-white text-xs font-bold py-2.5 rounded-xl hover:bg-amber-400 transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Enviar reporte
+                  {sending ? "Enviando…" : "Enviar reporte"}
                 </button>
               </form>
             )}

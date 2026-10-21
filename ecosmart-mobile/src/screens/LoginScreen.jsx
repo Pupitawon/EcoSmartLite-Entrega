@@ -2,24 +2,40 @@ import React, { useState } from "react";
 import { User, Lock, Users, ShieldCheck } from "lucide-react";
 import logoClaro from "../assets/logo-claro.png";
 import logoOscuro from "../assets/logo-oscuro.png";
+import { iniciarSesion, mensajeError } from "../services/auth.js";
 
 export default function LoginScreen({ darkMode = true, onLogin, onGoToRegister }) {
   const [role, setRole] = useState("ciudadano"); // ciudadano | admin
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [cargando, setCargando] = useState(false);
 
   const currentLogo = darkMode ? logoOscuro : logoClaro;
   const isAdmin = role === "admin";
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!username.trim() || !password.trim()) {
-      setError("Completa usuario y contraseña para continuar.");
+      setError(isAdmin ? "Completa usuario y contraseña para continuar." : "Completa correo y contraseña para continuar.");
       return;
     }
     setError("");
-    onLogin?.(username, role);
+    // El administrador sigue con el acceso de demostración; los ciudadanos entran con su cuenta de Firebase.
+    if (isAdmin) return onLogin?.(username, role);
+    setCargando(true);
+    try {
+      const perfil = await iniciarSesion(username.trim(), password);
+      if (!perfil) {
+        setError("Tu cuenta no completó el registro. Regístrate de nuevo con ese correo.");
+        return;
+      }
+      onLogin?.(perfil.nombre_completo.split(" ")[0], role, perfil);
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setCargando(false);
+    }
   };
 
   return (
@@ -58,14 +74,15 @@ export default function LoginScreen({ darkMode = true, onLogin, onGoToRegister }
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className={`block text-xs font-bold mb-1.5 ${darkMode ? "text-zinc-300" : "text-stone-700"}`}>Usuario</label>
+            <label className={`block text-xs font-bold mb-1.5 ${darkMode ? "text-zinc-300" : "text-stone-700"}`}>{isAdmin ? "Usuario" : "Correo"}</label>
             <div className={`flex items-center border rounded-xl px-3 transition-colors ${darkMode ? "bg-zinc-950 border-zinc-800 focus-within:border-emerald-500" : "bg-stone-50 border-stone-300 focus-within:border-emerald-600"}`}>
               <User className="w-4 h-4 text-stone-400 shrink-0" />
               <input
-                type="text"
+                type={isAdmin ? "text" : "email"}
+                autoComplete={isAdmin ? "username" : "email"}
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder={isAdmin ? "Usuario operativo" : "Ingresa tu usuario"}
+                placeholder={isAdmin ? "Usuario operativo" : "tucorreo@ejemplo.cl"}
                 className="w-full px-2 py-2.5 text-sm focus:outline-none bg-transparent"
               />
             </div>
@@ -89,9 +106,10 @@ export default function LoginScreen({ darkMode = true, onLogin, onGoToRegister }
 
           <button
             type="submit"
-            className={`w-full py-3 rounded-xl text-white font-bold text-sm shadow-md transition-all active:scale-[0.99] mt-2 ${isAdmin ? "bg-zinc-700 hover:bg-zinc-600" : "bg-emerald-600 hover:bg-emerald-500"}`}
+            disabled={cargando}
+            className={`disabled:opacity-60 w-full py-3 rounded-xl text-white font-bold text-sm shadow-md transition-all active:scale-[0.99] mt-2 ${isAdmin ? "bg-zinc-700 hover:bg-zinc-600" : "bg-emerald-600 hover:bg-emerald-500"}`}
           >
-            {isAdmin ? "Ingresar al panel" : "Iniciar Sesión"}
+            {cargando ? "Ingresando…" : isAdmin ? "Ingresar al panel" : "Iniciar Sesión"}
           </button>
         </form>
 

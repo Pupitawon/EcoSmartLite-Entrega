@@ -6,6 +6,8 @@ import BottomNav from "./components/BottomNav.jsx";
 // Importación de pantallas
 import InicioScreen from "./screens/InicioScreen.jsx";
 import LoginScreen from "./screens/LoginScreen.jsx";
+import RegisterScreen from "./screens/RegisterScreen.jsx";
+import { cerrarSesion } from "./services/auth.js";
 import MapaScreen from "./screens/MapaScreen.jsx";
 import EstacionScreen from "./screens/EstacionScreen.jsx";
 import CanjeoScreen from "./screens/CanjeoScreen.jsx";
@@ -54,7 +56,8 @@ export default function App() {
   const navigate = (target) => setScreen(target);
   const handleScanned = (earned) => setPoints((p) => p + earned);
 
-  const handleLogin = (username, role = "ciudadano") => {
+  const handleLogin = (username, role = "ciudadano", perfil = null) => {
+    if (perfil) setPoints(perfil.saldo_ecopoints);
     const formattedName = username ? username.charAt(0).toUpperCase() + username.slice(1) : "Jeremy";
     setUserName(formattedName);
     setUserRole(role);
@@ -63,6 +66,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    cerrarSesion().catch(() => {});
     setIsLoggedIn(false);
     setUserRole("ciudadano");
     navigate("login");
@@ -94,14 +98,15 @@ export default function App() {
   };
 
   const renderScreen = () => {
+    if (!isLoggedIn && screen === "registro") {
+      return <RegisterScreen darkMode={darkMode} onRegistered={(p) => handleLogin(p.nombre_completo.split(" ")[0], "ciudadano", p)} onBack={() => navigate("login")} />;
+    }
     if (!isLoggedIn || screen === "login") {
       return (
         <LoginScreen
           darkMode={darkMode}
           onLogin={handleLogin}
-          onGoToRegister={() =>
-            alert("Flujo de registro (mock) — próximamente.")
-          }
+          onGoToRegister={() => navigate("registro")}
         />
       );
     }

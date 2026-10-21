@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">EcoSmartLite</string>
+    <string name="title_activity_main">EcoSmartLite</string>
+    <string name="package_name">com.inacap.ecosmart</string>
+    <string name="custom_url_scheme">com.inacap.ecosmart</string>
+</resources>

@@ -82,11 +82,12 @@ async function listarReportes(estado) {
 async function cambiarEstado(id, estadoRevision) {
   const { rowCount } = await pool.query(
     `UPDATE reporte_anomalia
-        SET estado_revision = $1,
-            fecha_revision = CASE WHEN $1 = 'pendiente' THEN NULL ELSE ${UTC_NOW} END
+        SET estado_revision = $1::text,
+            fecha_revision = CASE WHEN $1::text = 'pendiente' THEN NULL ELSE ${UTC_NOW} END
       WHERE id_reporte = $2`,
     [estadoRevision, id]
   );
+
   if (!rowCount) return null;
   const reporte = await buscarReporte(id);
   bus.emit('reporte', reporte);

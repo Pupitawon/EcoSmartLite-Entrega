@@ -5,6 +5,5 @@ const { requireFirebaseUser } = require('../middleware/firebaseAuth');
 
 router.post('/registro', requireFirebaseUser, registrarUsuario);
 router.get('/me', requireFirebaseUser, miPerfil);
-router.post('/deposito', registrarDeposito);
-
+router.post('/deposito', requireFirebaseUser, registrarDeposito);
 module.exports = router;

@@ -17,7 +17,11 @@ const getContenedores = async (req, res) => {
 // sin duplicados. La ruta exige credencial (ver contenedorRoutes.js).
 const updateNivelLlenado = (req, res, next) =>
   aplicarLectura(
-    { id_contenedor: Number(req.params.id), porcentaje_llenado: req.body?.porcentaje_llenado },
+    {
+      id_contenedor: Number(req.params.id),
+      porcentaje_llenado: req.body?.porcentaje_llenado,
+      fecha_lectura: req.body?.fecha_lectura,
+    },
     res,
     next,
     { okStatus: 200, conMensaje: true }

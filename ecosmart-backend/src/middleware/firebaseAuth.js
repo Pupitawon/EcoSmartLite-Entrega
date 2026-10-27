@@ -11,8 +11,8 @@ async function requireFirebaseUser(req, res, next) {
   if (!jwks) {
     return res.status(503).json({ error: 'firebase_no_configurado', mensaje: 'Falta FIREBASE_PROJECT_ID en el servidor' });
   }
-  const header = req.get('authorization') || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+  const match = /^Bearer\s+(.+)$/i.exec(req.get('authorization') || '');
+  const token = match ? match[1].trim() : '';
   if (!token) {
     return res.status(401).json({ error: 'no_autorizado', mensaje: 'Falta el encabezado Authorization: Bearer' });
   }

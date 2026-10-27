@@ -1,6 +1,7 @@
 const { z } = require('zod');
 const pool = require('../config/db');
 
+
 // RUT chileno: 7-8 dígitos + dígito verificador (módulo 11). Se guarda como 12345678-K, sin puntos.
 function normalizarRut(raw) {
   return String(raw).replace(/[.\s]/g, '').toUpperCase();
@@ -78,40 +79,50 @@ const miPerfil = async (req, res) => {
 };
 
 // Registrar depósito de residuo y abonar EcoPoints
+const ECOPOINTS_POR_DEPOSITO = 10;
+
+const depositoSchema = z.object({
+  id_contenedor: z.number().int().positive(),
+  codigo_qr_escaneado: z.string().trim().min(1).max(200),
+});
+
 const registrarDeposito = async (req, res) => {
-  const { id_usuario, id_contenedor, codigo_qr_escaneado, ecopoints_otorgados } = req.body;
-
-  try {
-    // 1. Insertar en la tabla deposito_residuo
-    const queryDeposito = `
-      INSERT INTO deposito_residuo (id_usuario, id_contenedor, codigo_qr_escaneado, ecopoints_otorgados)
-      VALUES ($1, $2, $3, $4)
-      RETURNING *
-    `;
-    const depositoResult = await pool.query(queryDeposito, [
-      id_usuario, 
-      id_contenedor, 
-      codigo_qr_escaneado, 
-      ecopoints_otorgados || 10
-    ]);
-
-    // 2. Sumar puntos al saldo del usuario
-    const queryUsuario = `
-      UPDATE usuario 
-      SET saldo_ecopoints = saldo_ecopoints + $1 
-      WHERE id_usuario = $2 
-      RETURNING id_usuario, nombre_completo, saldo_ecopoints
-    `;
-    const usuarioResult = await pool.query(queryUsuario, [ecopoints_otorgados || 10, id_usuario]);
-
-    res.json({
-      mensaje: '¡Depósito registrado con éxito!',
-      deposito: depositoResult.rows[0],
-      usuario: usuarioResult.rows[0]
+  const parsed = depositoSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(422).json({
+      error: 'datos_invalidos',
+      detalles: parsed.error.issues.map((i) => ({ campo: i.path.join('.'), mensaje: i.message })),
     });
+  }
+  const { id_contenedor, codigo_qr_escaneado } = parsed.data;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const u = await client.query('SELECT id_usuario FROM usuario WHERE id_auth = $1 FOR UPDATE', [req.user.uid]);
+    if (!u.rows[0]) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'perfil_no_encontrado' });
+    }
+    const idUsuario = u.rows[0].id_usuario;
+    const dep = await client.query(
+      `INSERT INTO deposito_residuo (id_usuario, id_contenedor, codigo_qr_escaneado, ecopoints_otorgados)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [idUsuario, id_contenedor, codigo_qr_escaneado, ECOPOINTS_POR_DEPOSITO]
+    );
+    const usr = await client.query(
+      `UPDATE usuario SET saldo_ecopoints = saldo_ecopoints + $1
+        WHERE id_usuario = $2 RETURNING id_usuario, nombre_completo, saldo_ecopoints`,
+      [ECOPOINTS_POR_DEPOSITO, idUsuario]
+    );
+    await client.query('COMMIT');
+    res.json({ mensaje: '¡Depósito registrado con éxito!', deposito: dep.rows[0], usuario: usr.rows[0] });
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    if (err.code === '23503') return res.status(404).json({ error: 'contenedor_no_existe' });
     console.error('Error al registrar depósito:', err.message);
-    res.status(500).json({ error: 'Error en el registro del depósito' });
+    res.status(500).json({ error: 'error_interno' });
+  } finally {
+    client.release();
   }
 };
 

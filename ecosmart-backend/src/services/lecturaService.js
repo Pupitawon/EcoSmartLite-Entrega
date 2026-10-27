@@ -12,7 +12,6 @@ const lecturaSchema = z
   .object({
     id_contenedor: z.number().int().positive(),
     porcentaje_llenado: z.number().min(0).max(100),
-    // Opcional: cuándo se midió (ISO 8601). Si no viene, se usa la hora del servidor.
     fecha_lectura: z.string().datetime({ offset: true }).optional(),
   })
   .strict()
@@ -21,7 +20,6 @@ const lecturaSchema = z
     path: ['fecha_lectura'],
   });
 
-// Mismos estados operativos que ya usaba el backend: disponible / atencion / critico.
 function estadoOperativo(p) {
   if (p >= config.umbralAlerta) return 'critico';
   if (p >= 50) return 'atencion';
@@ -52,7 +50,6 @@ function aDTO(row) {
     fecha_ultima_lectura: ult ? ult.toISOString() : null,
     estado_operativo: row.estado_operativo,
     alerta_activa: Boolean(row.alerta_activa),
-    // Señal "contenedor sin reporte": nunca reportó, o pasó más del límite sin lectura.
     sin_reporte: !ult || Date.now() - ult.getTime() > limiteMs,
   };
 }
@@ -94,9 +91,6 @@ async function listarAlertas(estado) {
 
 // ---------------------------------------------------------------------------
 // Registrar una lectura + regla de alerta (todo en UNA transacción)
-//  - >= umbral: crea alerta 'pendiente' solo si no hay otra pendiente para ese contenedor.
-//    La garantía "sin duplicados" es el índice único parcial de sql/01_migracion_lecturas.sql.
-//  - <  umbral: la alerta pendiente pasa a 'resuelta'; si vuelve a subir, nace una nueva.
 // ---------------------------------------------------------------------------
 async function registrarLectura({ id_contenedor, porcentaje_llenado, fecha_lectura }) {
   const fecha = fecha_lectura ? new Date(fecha_lectura) : new Date();
@@ -104,10 +98,8 @@ async function registrarLectura({ id_contenedor, porcentaje_llenado, fecha_lectu
   let resultado;
   try {
     await client.query('BEGIN');
-    // Todos los TIMESTAMP de esta transacción se escriben en UTC.
     await client.query("SET LOCAL TIME ZONE 'UTC'");
 
-    // FOR UPDATE serializa lecturas simultáneas del mismo contenedor.
     const { rows } = await client.query(
       'SELECT fecha_ultima_lectura FROM contenedor WHERE id_contenedor = $1 FOR UPDATE',
       [id_contenedor]
@@ -116,10 +108,18 @@ async function registrarLectura({ id_contenedor, porcentaje_llenado, fecha_lectu
       await client.query('ROLLBACK');
       return { estado: 'no_encontrado' };
     }
+
+    // Guardar siempre en la tabla histórica
+    await client.query(
+      `INSERT INTO lectura (id_contenedor, porcentaje_llenado, fecha_lectura)
+       VALUES ($1, $2, ($3::timestamptz AT TIME ZONE 'UTC'))
+       ON CONFLICT (id_contenedor, fecha_lectura) DO NOTHING`,
+      [id_contenedor, porcentaje_llenado, fecha.toISOString()]
+    );
+
     const previa = rows[0].fecha_ultima_lectura;
     if (previa && fecha < new Date(previa)) {
-      // Llegó una lectura más antigua que la ya guardada (típico al sincronizar offline): se ignora.
-      await client.query('ROLLBACK');
+      await client.query('COMMIT');
       return { estado: 'obsoleta' };
     }
 
@@ -161,12 +161,17 @@ async function registrarLectura({ id_contenedor, porcentaje_llenado, fecha_lectu
     client.release();
   }
 
-  // Se avisa al panel solo cuando la transacción ya quedó confirmada.
-  bus.emit('lectura', {
-    contenedor: resultado.contenedor,
-    alerta_creada: resultado.alertaCreada,
-    alerta_resuelta: resultado.alertaResuelta,
-  });
+  // Protección del Event Bus
+  try {
+    bus.emit('lectura', {
+      contenedor: resultado.contenedor,
+      alerta_creada: resultado.alertaCreada,
+      alerta_resuelta: resultado.alertaResuelta,
+    });
+  } catch (e) {
+    console.error('Error en listener de lectura:', e);
+  }
+
   return resultado;
 }
 

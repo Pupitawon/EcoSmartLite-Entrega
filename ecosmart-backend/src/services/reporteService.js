@@ -18,6 +18,15 @@ const reporteSchema = z
 
 const revisionSchema = z.object({ estado_revision: z.enum(ESTADOS_REVISION) }).strict();
 
+// Si un listener del bus falla, el reporte ya está guardado: no se debe responder 500 ni provocar reintentos.
+function emitirSeguro(evento, datos) {
+  try {
+    bus.emit(evento, datos);
+  } catch (e) {
+    console.error(`Error en listener de ${evento}:`, e);
+  }
+}
+
 // El panel es público: no se exponen nombre, RUT ni correo de quien reporta.
 const SELECT_REPORTE = `
   SELECT r.id_reporte, r.id_contenedor, r.tipo_anomalia, r.descripcion_problema,
@@ -51,6 +60,7 @@ async function crearReporte(idAuth, datos) {
   const { rows: usuarios } = await pool.query('SELECT id_usuario FROM usuario WHERE id_auth = $1', [idAuth]);
   if (!usuarios[0]) return { estado: 'perfil_no_encontrado' };
 
+  let reporte;
   try {
     const { rows } = await pool.query(
       `INSERT INTO reporte_anomalia (id_usuario, id_contenedor, tipo_anomalia, descripcion_problema, fecha_reporte, estado_revision)
@@ -58,13 +68,14 @@ async function crearReporte(idAuth, datos) {
        RETURNING id_reporte`,
       [usuarios[0].id_usuario, datos.id_contenedor, datos.tipo_anomalia, datos.descripcion]
     );
-    const reporte = await buscarReporte(rows[0].id_reporte);
-    bus.emit('reporte', reporte); // el stream SSE lo reenvía al panel
-    return { estado: 'creado', reporte };
+    reporte = await buscarReporte(rows[0].id_reporte);
   } catch (err) {
     if (err.code === '23503') return { estado: 'contenedor_no_existe' };
     throw err;
   }
+
+  emitirSeguro('reporte', reporte); // el stream SSE lo reenvía al panel
+  return { estado: 'creado', reporte };
 }
 
 async function listarReportes(estado) {
@@ -90,8 +101,16 @@ async function cambiarEstado(id, estadoRevision) {
 
   if (!rowCount) return null;
   const reporte = await buscarReporte(id);
-  bus.emit('reporte', reporte);
+  emitirSeguro('reporte', reporte);
   return reporte;
 }
 
-module.exports = { reporteSchema, revisionSchema, crearReporte, listarReportes, cambiarEstado, TIPOS_ANOMALIA, ESTADOS_REVISION };
+module.exports = {
+  reporteSchema,
+  revisionSchema,
+  crearReporte,
+  listarReportes,
+  cambiarEstado,
+  TIPOS_ANOMALIA,
+  ESTADOS_REVISION,
+};

@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "EcoSmart",
-    "slug": "ecosmart",
+    "slug": "ecosmart-innova",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -26,6 +26,12 @@
     },
     "plugins": [
       "expo-status-bar"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "b8249cdf-54e4-41b8-b597-0811dcb067d9"
+      }
+    },
+    "owner": "leocastleyi"
   }
 }

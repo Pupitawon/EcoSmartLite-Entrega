@@ -1,6 +1,6 @@
 param(
   [string]$Key = $env:INGEST_API_KEY,
-  [string]$Base = "http://127.0.0.1:5000",
+  [string]$Base = "https://ecosmart-backend-w0so.onrender.com",
   [int]$Id = 1
 )
 if (-not $Key) { Write-Host "Define `$env:INGEST_API_KEY primero" -ForegroundColor Red; exit 1 }

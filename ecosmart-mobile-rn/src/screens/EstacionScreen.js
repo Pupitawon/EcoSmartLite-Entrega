@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { AlertTriangle, CheckCircle2, ChevronLeft, QrCode, Recycle, X } from 'lucide-react-native';
 import { enviarReporte } from '../services/auth';
-import { ANOMALY_TYPES, STATUS_META, getPinStatus, temaDe } from '../tema';
+import { ANOMALY_TYPES, STATUS_META, getPinStatus, horaLocal, temaDe } from '../tema';
 
 /**
  * Detalle de la estación (se llega desde la tarjeta de un pin del mapa) con el flujo de
@@ -78,6 +78,9 @@ export default function EstacionScreen({ station, darkMode, onBack }) {
           <Text style={{ fontSize: 14, fontWeight: '600', color: t.textoCampo }}>Estado</Text>
           <Text style={{ fontSize: 14, fontWeight: '600', color: meta.color }}>{meta.label}</Text>
         </View>
+        <Text style={{ fontSize: 11, color: t.textoSuave, marginTop: 8 }}>
+          Última lectura: {horaLocal(station?.ultimaLectura)}
+        </Text>
       </View>
 
       <Pressable onPress={() => setAbierto(true)} style={[e.reportar, { borderColor: '#f59e0b' }]}>
@@ -146,7 +149,7 @@ export default function EstacionScreen({ station, darkMode, onBack }) {
 
                 {!!error && <Text style={{ fontSize: 11, color: t.error, marginTop: 4 }}>{error}</Text>}
 
-                   <Pressable
+                <Pressable
                   onPress={enviar}
                   disabled={enviando || !descripcion.trim()}
                   style={[e.enviar, { backgroundColor: '#f59e0b', opacity: enviando || !descripcion.trim() ? 0.5 : 1 }]}

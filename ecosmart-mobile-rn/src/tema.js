@@ -14,8 +14,21 @@ export function getFillStatus(fill) {
   return 'low';
 }
 
-// Sin lectura reciente del sensor (campo sin_reporte de la API) no se muestra un color falso.
-export const getPinStatus = (pin) => getFillStatus(pin.fill);
+// Sin lectura reciente del sensor (campo sin_reporte de la API) no se muestra un color falso: el pin va gris.
+export const getPinStatus = (pin) => (pin.sinReporte ? 'unknown' : getFillStatus(pin.fill));
+
+// Fecha ISO (UTC) -> hora de Santiago, ej. "27-10-2026, 05:15".
+export const horaLocal = (iso) =>
+  iso
+    ? new Date(iso).toLocaleString('es-CL', {
+        timeZone: 'America/Santiago',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : 'sin datos';
 
 // Mismos ids que acepta POST /api/reportes.
 export const ANOMALY_TYPES = [

@@ -5,7 +5,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { MapPin, Recycle, RefreshCw, X } from 'lucide-react-native';
 import MapaView from '../components/MapaView';
 import useContenedores from '../hooks/useContenedores';
-import { STATUS_META, getPinStatus, temaDe } from '../tema';
+import { STATUS_META, getPinStatus, horaLocal, temaDe } from '../tema';
 
 // Contenedor del backend -> pin del mapa. id_contenedor es lo que necesita el reporte ciudadano.
 const aPin = (c) => ({
@@ -17,6 +17,7 @@ const aPin = (c) => ({
   fill: Math.round(c.porcentaje_llenado),
   address: c.direccion || null,
   sinReporte: Boolean(c.sin_reporte),
+  ultimaLectura: c.fecha_ultima_lectura || null,
 });
 
 export default function MapaScreen({ darkMode, onViewStation }) {
@@ -30,7 +31,7 @@ export default function MapaScreen({ darkMode, onViewStation }) {
   );
   // Se busca por id para que la tarjeta se actualice sola cuando llega un % nuevo.
   const seleccionado = pins.find((p) => p.id_contenedor === seleccionadoId) || null;
-    const meta = seleccionado ? STATUS_META[getPinStatus(seleccionado)] : null;
+  const meta = seleccionado ? STATUS_META[getPinStatus(seleccionado)] : null;
 
   return (
     <View style={e.pantalla}>
@@ -107,6 +108,9 @@ export default function MapaScreen({ darkMode, onViewStation }) {
               <View style={[e.barra, { backgroundColor: darkMode ? '#27272a' : '#e7e5e4' }]}>
                 <View style={{ width: `${seleccionado.fill}%`, height: '100%', borderRadius: 999, backgroundColor: meta.color }} />
               </View>
+              <Text style={{ fontSize: 10, color: t.textoSuave, marginTop: 4 }}>
+                Última lectura: {horaLocal(seleccionado.ultimaLectura)}
+              </Text>
             </View>
 
             {!!seleccionado.category && (

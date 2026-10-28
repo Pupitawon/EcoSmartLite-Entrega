@@ -6,7 +6,10 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "ios": { "supportsTablet": true, "bundleIdentifier": "com.inacap.ecosmart" },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.inacap.ecosmart"
+    },
     "android": {
       "package": "com.inacap.ecosmart",
       "adaptiveIcon": {
@@ -16,6 +19,13 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       }
     },
-    "web": { "favicon": "./assets/favicon.png", "bundler": "metro", "output": "single" }
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-status-bar"
+    ]
   }
 }

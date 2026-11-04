@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { MapPin, Recycle, RefreshCw, X } from 'lucide-react-native';
+import { LocateFixed, MapPin, Recycle, RefreshCw, X } from 'lucide-react-native';
 import MapaView from '../components/MapaView';
 import useContenedores from '../hooks/useContenedores';
+import useUbicacion from '../hooks/useUbicacion';
 import { STATUS_META, getPinStatus, horaLocal, temaDe } from '../tema';
 
 // Contenedor del backend -> pin del mapa. id_contenedor es lo que necesita el reporte ciudadano.
@@ -24,6 +25,9 @@ export default function MapaScreen({ darkMode, onViewStation }) {
   const t = temaDe(darkMode);
   const { contenedores, cargando, error, recargar } = useContenedores();
   const [seleccionadoId, setSeleccionadoId] = useState(null);
+  const { posicion, estado: estadoUbicacion, reintentar } = useUbicacion();
+  const [centrar, setCentrar] = useState(0); // cada toque al botón lleva el mapa al usuario
+  const irAMiUbicacion = () => (posicion ? setCentrar((n) => n + 1) : reintentar());
 
   const pins = useMemo(
     () => contenedores.filter((c) => c.latitud != null && c.longitud != null).map(aPin),
@@ -43,7 +47,22 @@ export default function MapaScreen({ darkMode, onViewStation }) {
       </View>
 
       <View style={[e.mapa, { borderColor: t.borde }]}>
-        <MapaView pins={pins} darkMode={darkMode} seleccionado={seleccionado} onSelect={(p) => setSeleccionadoId(p.id_contenedor)} />
+        <MapaView pins={pins} darkMode={darkMode} seleccionado={seleccionado} onSelect={(p) => setSeleccionadoId(p.id_contenedor)} posicion={posicion} centrar={centrar} />
+
+        <Pressable
+          onPress={irAMiUbicacion}
+          accessibilityLabel="Centrar en mi ubicación"
+          style={[e.botonUbicacion, { backgroundColor: t.superficie, borderColor: t.borde }]}
+        >
+          <LocateFixed size={20} color={posicion ? '#3b82f6' : t.textoSuave} />
+        </Pressable>
+        {!error && estadoUbicacion === 'denegado' && (
+          <View style={[e.banner, { backgroundColor: t.superficie }]}>
+            <Text style={{ color: t.textoSuave, fontSize: 12 }}>
+              Activa el permiso de ubicación para ver dónde estás en el mapa.
+            </Text>
+          </View>
+        )}
 
         {cargando && (
           <View style={e.aviso}>
@@ -138,6 +157,7 @@ const e = StyleSheet.create({
   mapa: { flex: 1, borderWidth: 1, borderRadius: 16, overflow: 'hidden', minHeight: 320 },
   aviso: { zIndex: 10, position: 'absolute', top: 12, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 999, padding: 8 },
   banner: { zIndex: 10, position: 'absolute', top: 12, left: 12, right: 12, borderRadius: 12, padding: 10 },
+  botonUbicacion: { zIndex: 10, position: 'absolute', right: 12, top: 60, width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   leyenda: { zIndex: 10, position: 'absolute', left: 12, bottom: 12, borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, gap: 4 },
   leyendaFila: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   punto: { width: 10, height: 10, borderRadius: 5 },

@@ -25,7 +25,13 @@
       "output": "single"
     },
     "plugins": [
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-localization",
+        {
+          "locationWhenInUsePermission": "EcoSmart usa tu ubicación para mostrarte los puntos de reciclaje más cercanos mientras usas el mapa."
+        }
+      ]
     ]
   }
 }

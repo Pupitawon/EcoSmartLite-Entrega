@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { MapContainer, Marker, TileLayer } from 'react-leaflet';
+import { Circle, MapContainer, Marker, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { CALAMA, STATUS_META, getPinStatus } from '../tema';
@@ -19,7 +19,26 @@ function icono(color, darkMode, activo) {
   });
 }
 
-export default function MapaView({ pins, darkMode, seleccionado, onSelect }) {
+// Punto azul del usuario (igual que el de Google Maps).
+const ICONO_USUARIO = L.divIcon({
+  className: '',
+  html: '<div style="width:18px;height:18px;border-radius:50%;background:#3b82f6;border:3px solid #fff;box-shadow:0 0 0 4px rgba(59,130,246,.3),0 2px 6px rgba(0,0,0,.4)"></div>',
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+});
+
+// Lleva el mapa al usuario cada vez que `centrar` (contador) cambia.
+function Centrador({ posicion, centrar }) {
+  const mapa = useMap();
+  useEffect(() => {
+    if (!centrar || !posicion) return;
+    mapa.flyTo([posicion.lat, posicion.lng], 16);
+  }, [centrar]); // eslint-disable-line react-hooks/exhaustive-deps
+  return null;
+}
+
+// posicion: { lat, lng, precision } del usuario (o null).
+export default function MapaView({ pins, darkMode, seleccionado, onSelect, posicion, centrar }) {
   useEffect(() => {
     const estilo = document.createElement('style');
     estilo.textContent = CSS_OSCURO;
@@ -36,6 +55,19 @@ export default function MapaView({ pins, darkMode, seleccionado, onSelect }) {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        <Centrador posicion={posicion} centrar={centrar} />
+        {posicion && (
+          <>
+            {posicion.precision != null && posicion.precision < 500 && (
+              <Circle
+                center={[posicion.lat, posicion.lng]}
+                radius={posicion.precision}
+                pathOptions={{ color: '#3b82f6', weight: 1, fillOpacity: 0.1 }}
+              />
+            )}
+            <Marker position={[posicion.lat, posicion.lng]} icon={ICONO_USUARIO} zIndexOffset={-1000} interactive={false} />
+          </>
+        )}
         {pins.map((pin) => {
           const color = STATUS_META[getPinStatus(pin)].color;
           const activo = seleccionado?.id_contenedor === pin.id_contenedor;

@@ -84,6 +84,6 @@ export default function App() {
 }
 
 const e = StyleSheet.create({
-  fondo: { flex: 1, alignItems: 'center' },
+  fondo: { flex: 1, alignItems: 'center', ...(Platform.OS === 'web' ? { height: '100dvh' } : {}) },
   marco: { flex: 1, width: '100%', maxWidth: Platform.OS === 'web' ? 440 : undefined, overflow: 'hidden' },
 });

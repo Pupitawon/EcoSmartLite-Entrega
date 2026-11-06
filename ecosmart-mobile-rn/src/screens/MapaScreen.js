@@ -6,6 +6,7 @@ import { LocateFixed, MapPin, Recycle, RefreshCw, X } from 'lucide-react-native'
 import MapaView from '../components/MapaView';
 import useContenedores from '../hooks/useContenedores';
 import useUbicacion from '../hooks/useUbicacion';
+import { distanciaMetros, textoDistancia } from '../utils/distancia';
 import { STATUS_META, getPinStatus, horaLocal, temaDe } from '../tema';
 
 // Contenedor del backend -> pin del mapa. id_contenedor es lo que necesita el reporte ciudadano.
@@ -36,6 +37,9 @@ export default function MapaScreen({ darkMode, onViewStation }) {
   // Se busca por id para que la tarjeta se actualice sola cuando llega un % nuevo.
   const seleccionado = pins.find((p) => p.id_contenedor === seleccionadoId) || null;
   const meta = seleccionado ? STATUS_META[getPinStatus(seleccionado)] : null;
+  const distancia = seleccionado && posicion
+  ? textoDistancia(distanciaMetros(posicion, { lat: seleccionado.lat, lng: seleccionado.lng }))
+  : null;
 
   return (
     <View style={e.pantalla}>
@@ -111,7 +115,7 @@ export default function MapaScreen({ darkMode, onViewStation }) {
               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 4 }}>
                 <MapPin size={12} color={t.textoSuave} />
                 <Text style={{ fontSize: 11, color: t.textoSuave, flexShrink: 1 }}>
-                  {seleccionado.address || 'Dirección no disponible'}
+                  {seleccionado.address || 'Dirección no disponible'}{distancia ? `  ·  a ${distancia}` : ''}
                 </Text>
               </View>
             </View>

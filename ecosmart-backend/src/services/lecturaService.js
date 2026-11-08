@@ -42,9 +42,10 @@ const SELECT_CONTENEDOR = `
 function estadoConexion(ult, ahora = Date.now()) {
   if (!ult) return { estado_conexion: 'sin_conexion', minutos_sin_lectura: null };
   const min = Math.max(0, Math.floor((ahora - ult.getTime()) / 60000));
-  const estado =
-    min >= config.sinConexionMin ? 'sin_conexion' : min >= config.retrasoMin ? 'retrasado' : 'en_linea';
-  return { estado_conexion: estado, minutos_sin_lectura: min };
+  return {
+    estado_conexion: min >= config.sinConexionMin ? 'sin_conexion' : 'en_linea',
+    minutos_sin_lectura: min,
+  };
 }
 
 function aDTO(row) {

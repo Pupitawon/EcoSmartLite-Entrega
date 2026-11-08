@@ -204,7 +204,7 @@ body{
 .view.active{display:block;}
 
 /* ---------- KPI cards ---------- */
-.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px;}
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:22px;}
 .kpi{
   background:var(--surface);
   border:1px solid var(--line);
@@ -705,6 +705,25 @@ async function getJSON(ruta){
   if(!r.ok) throw new Error(`El servidor respondió ${r.status}`);
   return r.json();
 }
+
+/* ===== Estado de conexión del sensor (en_linea / retrasado / sin_conexion) ===== */
+let conexion = {};
+const CONEXION_TXT = { en_linea: "En línea", retrasado: "Retrasado", sin_conexion: "Sin conexión" };
+const CONEXION_COLOR = { en_linea: "var(--good)", retrasado: "var(--warning)", sin_conexion: "var(--critical)" };
+const conexionDe = (c) => conexion[c.id_contenedor] || null;
+function pillConexion(c){
+  const k = conexionDe(c); if(!k) return "";
+  const col = CONEXION_COLOR[k.estado_conexion] || "var(--ink-soft)";
+  return `<span class="pill-sr" style="background:transparent;border:1px solid ${col};color:${col}">${CONEXION_TXT[k.estado_conexion] || k.estado_conexion}</span>`;
+}
+async function cargarConexion(){
+  try {
+    const l = await getJSON("/api/contenedores/conexion");
+    conexion = {}; for(const x of l) conexion[x.id_contenedor] = x;
+    if(cargado) renderTodo();
+  } catch (e) { /* si el endpoint no existe aún, el resto del panel sigue igual */ }
+}
+
 async function cargar(){
   try {
     const [cfg, cont, alr, rep] = await Promise.all([
@@ -714,7 +733,7 @@ async function cargar(){
     if(cfg) config = cfg;
     const sig = {};
     for(const c of cont){ const p = contenedores[c.id_contenedor]; sig[c.id_contenedor] = (p && tiempo(p) > tiempo(c)) ? p : c; }
-    contenedores = sig; alertas = alr; if(rep) reportes = rep; cargado = true;
+    contenedores = sig; alertas = alr; if(rep) reportes = rep; cargado = true; cargarConexion();
     document.getElementById("banner").style.display = "none";
     renderTodo();
   } catch (e) {
@@ -758,6 +777,7 @@ function setLive(on){
   document.getElementById("liveBox").className = "live " + (on ? "on" : "off");
   document.getElementById("liveTxt").textContent = on ? "En vivo" : "Reconectando…";
 }
+setInterval(cargarConexion, 15000); // estado de conexión del sensor
 setInterval(() => { ahora = Date.now(); if(cargado) renderTodo(); }, 30000); // "hace X" y "Sin reporte" avanzan solos
 
 /* ================= NAV ================= */
@@ -782,7 +802,8 @@ function renderKPIs(){
     <div class="kpi"><div class="num">${l.length}</div><div class="lbl">Contenedores</div></div>
     <div class="kpi"><div class="num crit">${l.filter(enAlerta).length}</div><div class="lbl">En alerta (≥ ${config.umbral_alerta}%)</div></div>
     <div class="kpi"><div class="num warn">${l.filter(sinReporte).length}</div><div class="lbl">Sin reporte (&gt; ${config.sin_reporte_horas} h)</div></div>
-    <div class="kpi"><div class="num good">${prom===null?"—":prom+"%"}</div><div class="lbl">Llenado promedio</div></div>`;
+      <div class="kpi"><div class="num good">${prom===null?"—":prom+"%"}</div><div class="lbl">Llenado promedio</div></div>
+    <div class="kpi"><div class="num crit">${l.filter(c=>{const k=conexionDe(c);return k && k.estado_conexion==="sin_conexion";}).length}</div><div class="lbl">Sensores sin conexión</div></div>`;
 }
 function renderTable(){
   const q = document.getElementById("searchInput").value.toLowerCase().trim();
@@ -804,7 +825,7 @@ function renderTable(){
       <td class="mono">${ubic(c)}</td>
       <td><span class="status-pill ${e.cls}"><span class="dot"></span>${e.txt}</span></td>
       <td>${nunca ? "—" : `<div class="batt-bar"><div class="batt-track"><div class="batt-fill" style="width:${Math.min(100,c.porcentaje_llenado)}%;background:${fillColor(c.porcentaje_llenado)}"></div></div><span class="batt-label">${Math.round(c.porcentaje_llenado)}%</span></div>`}</td>
-      <td style="${sr?"color:var(--warning);font-weight:500;":""}">${hace(c.fecha_ultima_lectura)}${sr && !nunca ? `<span class="pill-sr">Sin reporte</span>` : ""}${nunca ? `<span class="pill-sr">Sin reporte</span>` : ""}</td>
+      <td style="${sr?"color:var(--warning);font-weight:500;":""}">${hace(c.fecha_ultima_lectura)}${sr && !nunca ? `<span class="pill-sr">Sin reporte</span>` : ""}${nunca ? `<span class="pill-sr">Sin reporte</span>` : ""}${pillConexion(c)}</td>
     </tr>`;
   }).join("");
 }
@@ -828,6 +849,7 @@ function openDetail(id){
         <div><div class="k">Estado</div><div class="v">${e.txt}</div></div>
         <div><div class="k">Última lectura</div><div class="v">${hace(c.fecha_ultima_lectura)}</div></div>
         <div><div class="k">Reporte</div><div class="v">${sinReporte(c)?"Sin reporte":"Al día"}</div></div>
+        <div><div class="k">Conexión del sensor</div><div class="v">${conexionDe(c) ? (CONEXION_TXT[conexionDe(c).estado_conexion] || "—") + (conexionDe(c).minutos_sin_lectura!=null ? " · " + conexionDe(c).minutos_sin_lectura + " min sin lectura" : "") : "—"}</div></div>
         <div><div class="k">Umbral de alerta</div><div class="v">${config.umbral_alerta}%</div></div>
       </div></div>
     <div class="detail-section"><h3>Historial de alertas</h3>

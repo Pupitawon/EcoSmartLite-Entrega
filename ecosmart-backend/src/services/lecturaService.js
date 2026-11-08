@@ -37,6 +37,16 @@ const SELECT_CONTENEDOR = `
     FROM contenedor c
     LEFT JOIN tipo_material m ON m.id_material = c.id_material`;
 
+// Estado de conexión del sensor según cuánto hace que no llega una lectura.
+// No distingue corte de energía de caída de internet: en ambos casos el nodo deja de reportar.
+function estadoConexion(ult, ahora = Date.now()) {
+  if (!ult) return { estado_conexion: 'sin_conexion', minutos_sin_lectura: null };
+  const min = Math.max(0, Math.floor((ahora - ult.getTime()) / 60000));
+  const estado =
+    min >= config.sinConexionMin ? 'sin_conexion' : min >= config.retrasoMin ? 'retrasado' : 'en_linea';
+  return { estado_conexion: estado, minutos_sin_lectura: min };
+}
+
 function aDTO(row) {
   const ult = row.fecha_ultima_lectura ? new Date(row.fecha_ultima_lectura) : null;
   const limiteMs = config.sinReporteHoras * 3_600_000;
@@ -51,6 +61,7 @@ function aDTO(row) {
     estado_operativo: row.estado_operativo,
     alerta_activa: Boolean(row.alerta_activa),
     sin_reporte: !ult || Date.now() - ult.getTime() > limiteMs,
+    ...estadoConexion(ult),
   };
 }
 
@@ -175,4 +186,4 @@ async function registrarLectura({ id_contenedor, porcentaje_llenado, fecha_lectu
   return resultado;
 }
 
-module.exports = { lecturaSchema, registrarLectura, listarContenedores, listarAlertas, aDTO };
+module.exports = { lecturaSchema, registrarLectura, listarContenedores, listarAlertas, aDTO, estadoConexion };

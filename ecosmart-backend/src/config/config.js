@@ -7,6 +7,9 @@ const config = {
   umbralAlerta: num(process.env.UMBRAL_ALERTA, 80),
   // Horas sin lectura para marcar un contenedor como "Sin reporte".
   sinReporteHoras: num(process.env.SIN_REPORTE_HORAS, 6),
+  // Estado de conexión del sensor.
+  retrasoMin: num(process.env.RETRASO_MIN, 15),          // desde aquí: "retrasado"
+  sinConexionMin: num(process.env.SIN_CONEXION_MIN, 25), // desde aquí: "sin_conexion"
 
   // Quién puede enviar lecturas (ver src/middleware/ingestAuth.js).
   apiKey: process.env.INGEST_API_KEY,

@@ -27,4 +27,24 @@ const updateNivelLlenado = (req, res, next) =>
     { okStatus: 200, conMensaje: true }
   );
 
-module.exports = { getContenedores, updateNivelLlenado };
+// Estado de conexión de cada sensor. Con ?solo_problemas=1 devuelve solo los retrasados o sin conexión.
+const getEstadoConexion = async (req, res) => {
+  try {
+    const todos = await listarContenedores();
+    const lista = todos
+      .filter((c) => req.query.solo_problemas !== '1' || c.estado_conexion !== 'en_linea')
+      .map((c) => ({
+        id_contenedor: c.id_contenedor,
+        nombre_material: c.nombre_material,
+        fecha_ultima_lectura: c.fecha_ultima_lectura,
+        minutos_sin_lectura: c.minutos_sin_lectura,
+        estado_conexion: c.estado_conexion,
+      }));
+    res.json(lista);
+  } catch (err) {
+    console.error('Error al obtener el estado de conexión:', err.message);
+    res.status(500).json({ error: 'Error en la base de datos' });
+  }
+};
+
+module.exports = { getContenedores, updateNivelLlenado, getEstadoConexion };

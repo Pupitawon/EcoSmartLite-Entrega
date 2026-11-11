@@ -12,4 +12,13 @@ const limiteLecturas = rateLimit({
   message: { error: 'demasiadas_solicitudes' },
 });
 
-module.exports = { limiteLecturas };
+// Recuperar contraseña: pocos intentos por IP, para que nadie pruebe combinaciones de correo y RUT.
+const limiteRecuperarClave = rateLimit({
+  windowMs: 15 * 60_000,
+  limit: 5,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'demasiadas_solicitudes' },
+});
+
+module.exports = { limiteLecturas, limiteRecuperarClave };

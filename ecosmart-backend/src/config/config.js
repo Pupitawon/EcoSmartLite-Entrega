@@ -13,6 +13,8 @@ const config = {
   // Quién puede enviar lecturas (ver src/middleware/ingestAuth.js).
   apiKey: process.env.INGEST_API_KEY,
   firebaseProjectId: process.env.FIREBASE_PROJECT_ID || null,
+  // Clave web de Firebase (pública). La usa el backend para pedir el correo de restablecimiento.
+  firebaseWebApiKey: process.env.FIREBASE_WEB_API_KEY || null,
   firebaseJwksUrl:
     process.env.FIREBASE_JWKS_URL ||
     'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com',

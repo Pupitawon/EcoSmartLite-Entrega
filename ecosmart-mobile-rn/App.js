@@ -10,6 +10,7 @@ import Header from './src/components/Header';
 import BottomNav from './src/components/BottomNav';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
+import RecuperarClaveScreen from './src/screens/RecuperarClaveScreen';
 import MapaScreen from './src/screens/MapaScreen';
 import EstacionScreen from './src/screens/EstacionScreen';
 
@@ -55,7 +56,9 @@ export default function App() {
   } else if (!perfil) {
     contenido = pantalla === 'registro'
       ? <RegisterScreen darkMode={darkMode} onRegistered={entrar} onBack={() => setPantalla('login')} />
-      : <LoginScreen darkMode={darkMode} onLogin={entrar} onGoToRegister={() => setPantalla('registro')} />;
+      : pantalla === 'recuperar'
+        ? <RecuperarClaveScreen darkMode={darkMode} onBack={() => setPantalla('login')} />
+        : <LoginScreen darkMode={darkMode} onLogin={entrar} onGoToRegister={() => setPantalla('registro')} onGoToRecuperar={() => setPantalla('recuperar')} />;
   } else {
     contenido = (
       <>

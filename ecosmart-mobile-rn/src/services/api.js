@@ -37,3 +37,13 @@ export async function llamar(ruta, opciones = {}) {
   const datos = await res.json().catch(() => ({}));
   return { status: res.status, datos };
 }
+
+// Llamada pública (sin sesión), para endpoints que no exigen token, como recuperar contraseña.
+export async function llamarPublico(ruta, opciones = {}) {
+  const res = await pedir(`${API_URL}${ruta}`, {
+    ...opciones,
+    headers: { 'Content-Type': 'application/json' },
+  });
+  const datos = await res.json().catch(() => ({}));
+  return { status: res.status, datos };
+}

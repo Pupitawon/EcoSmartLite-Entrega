@@ -1,5 +1,6 @@
 const { z } = require('zod');
 const pool = require('../config/db');
+const config = require('../config/config');
 
 
 // RUT chileno: 7-8 dígitos + dígito verificador (módulo 11). Se guarda como 12345678-K, sin puntos.
@@ -126,4 +127,54 @@ const registrarDeposito = async (req, res) => {
   }
 };
 
-module.exports = { registrarDeposito, registrarUsuario, miPerfil, rutValido, normalizarRut };
+// ---- Recuperar contraseña: exige correo y RUT del mismo usuario ----
+const recuperarSchema = z
+  .object({
+    correo: z.string().trim().toLowerCase().email().max(254),
+    rut: z.string().transform(normalizarRut).refine(rutValido, 'RUT inválido'),
+  })
+  .strict();
+
+const MENSAJE_RECUPERAR =
+  'Si los datos coinciden con una cuenta, te enviamos un enlace para restablecer tu contraseña.';
+
+// Endpoint público. Responde siempre lo mismo (coincidan o no los datos) y antes de consultar,
+// para no revelar qué correos o RUT están registrados ni por el contenido ni por el tiempo de respuesta.
+const recuperarClave = async (req, res) => {
+  const parsed = recuperarSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(422).json({
+      error: 'datos_invalidos',
+      detalles: parsed.error.issues.map((i) => ({ campo: i.path.join('.'), mensaje: i.message })),
+    });
+  }
+  if (!config.firebaseWebApiKey) {
+    console.error('Falta FIREBASE_WEB_API_KEY: no se puede enviar el correo de recuperación');
+    return res.status(503).json({ error: 'servicio_no_disponible' });
+  }
+
+  res.json({ ok: true, mensaje: MENSAJE_RECUPERAR });
+
+  try {
+    const { correo, rut } = parsed.data;
+    const r = await pool.query('SELECT 1 FROM usuario WHERE rut = $1 AND LOWER(correo) = $2', [rut, correo]);
+    if (!r.rowCount) return; // no coincide: no se envía nada
+
+    const resp = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${config.firebaseWebApiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Firebase-Locale': 'es' },
+        body: JSON.stringify({ requestType: 'PASSWORD_RESET', email: correo }),
+      }
+    );
+    if (!resp.ok) {
+      const cuerpo = await resp.json().catch(() => ({}));
+      console.error('Firebase no envió el correo de recuperación:', resp.status, cuerpo?.error?.message);
+    }
+  } catch (err) {
+    console.error('Error en recuperar clave:', err.message);
+  }
+};
+
+module.exports = { registrarDeposito, registrarUsuario, miPerfil, recuperarClave, rutValido, normalizarRut };

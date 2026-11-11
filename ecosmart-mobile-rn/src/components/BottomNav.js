@@ -1,11 +1,10 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { LogOut, MapPin } from 'lucide-react-native';
+import { LogOut, MapPin, QrCode } from 'lucide-react-native';
 import { temaDe } from '../tema';
 
-// Sprint 1: solo existen el Mapa y salir. Las demás pestañas de la app de Jeremy
-// (Inicio, Escanear, Logros, Perfil) corresponden a historias de otros sprints.
 const ITEMS = [
   { id: 'mapa', icon: MapPin, label: 'Mapa' },
+  { id: 'escanear', icon: QrCode, label: 'Escanear' },
   { id: 'logout', icon: LogOut, label: 'Salir' },
 ];
 
@@ -43,5 +42,5 @@ const e = StyleSheet.create({
     borderTopRightRadius: 24,
     borderTopWidth: 1,
   },
-  item: { alignItems: 'center', borderRadius: 16, paddingHorizontal: 28, paddingVertical: 8 },
+  item: { alignItems: 'center', borderRadius: 16, paddingHorizontal: 22, paddingVertical: 8 },
 });

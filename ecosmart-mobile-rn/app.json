@@ -31,6 +31,12 @@
         {
           "locationWhenInUsePermission": "EcoSmart usa tu ubicación para mostrarte los puntos de reciclaje más cercanos mientras usas el mapa."
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Usamos la cámara para escanear el QR del contenedor."
+        }
       ]
     ]
   }

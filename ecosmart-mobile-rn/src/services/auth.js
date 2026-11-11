@@ -70,7 +70,7 @@ export async function recuperarClave(correo, rut) {
   );
 }
 
-/** Envía un reporte ciudadano de anomalía (RF-05). Llega al panel web de Innova Recicla. */
+/** Envía un reporte ciudadano de anomalía (RF-05). Lo revisa el administrador (Innova Recicla) desde la app. */
 export async function enviarReporte({ id_contenedor, tipo_anomalia, descripcion }) {
   const { status, datos } = await llamar('/api/reportes', {
     method: 'POST',

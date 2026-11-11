@@ -1,3 +1,5 @@
+// UID de administrador para estas pruebas (se define antes de cargar la app, que lee la config al iniciar).
+process.env.ADMIN_UIDS = 'uid-rep-admin';
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
@@ -45,8 +47,12 @@ const reportar = async (body, sub = 'uid-rep-1') =>
     body: JSON.stringify(body),
   });
 
-const revisar = (id, body) =>
-  fetch(`${base}/api/reportes/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+const revisar = async (id, body, sub = 'uid-rep-admin') =>
+  fetch(`${base}/api/reportes/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...(sub ? { Authorization: `Bearer ${await token(sub)}` } : {}) },
+    body: JSON.stringify(body),
+  });
 
 test('sin token → 401; usuario sin perfil → 404; contenedor inexistente → 404', async () => {
   assert.equal((await reportar({ id_contenedor: 101, tipo_anomalia: 'danado' }, null)).status, 401);
@@ -86,7 +92,7 @@ test('crea el reporte pendiente, lo emite en vivo y el panel lo lista sin datos 
   assert.equal('id_usuario' in fila || 'rut' in fila || 'correo' in fila, false);
 });
 
-test('el panel cambia el estado de revisión; estado inválido → 422; id inexistente → 404', async () => {
+test('el administrador cambia el estado de revisión; estado inválido → 422; id inexistente → 404', async () => {
   const { reporte } = await (await reportar({ id_contenedor: 103, tipo_anomalia: 'danado' })).json();
 
   const ok = await revisar(reporte.id_reporte, { estado_revision: 'resuelto' });
@@ -99,5 +105,7 @@ test('el panel cambia el estado de revisión; estado inválido → 422; id inexi
   assert.equal(pendientes.some((x) => x.id_reporte === reporte.id_reporte), false);
 
   assert.equal((await revisar(reporte.id_reporte, { estado_revision: 'cerrado' })).status, 422);
+  assert.equal((await revisar(reporte.id_reporte, { estado_revision: 'pendiente' }, null)).status, 401);
+  assert.equal((await revisar(reporte.id_reporte, { estado_revision: 'pendiente' }, 'uid-rep-1')).status, 403);
   assert.equal((await revisar(999999, { estado_revision: 'resuelto' })).status, 404);
 });

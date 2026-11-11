@@ -9,21 +9,24 @@ const ITEMS = [
   { id: 'logout', icon: LogOut, label: 'Salir' },
 ];
 
-export default function BottomNav({ active, darkMode, onNavigate }) {
+// `items` permite reemplazar las pestañas (ej. las del administrador).
+export default function BottomNav({ active, darkMode, onNavigate, items = ITEMS }) {
   const t = temaDe(darkMode);
+  const compacta = items.length > 3;
   return (
     <View style={[e.nav, { backgroundColor: t.navFondo, borderTopColor: darkMode ? '#27272a' : '#047857' }]}>
-      {ITEMS.map(({ id, icon: Icon, label }) => {
+      {items.map(({ id, icon: Icon, label }) => {
         const activo = active === id;
         return (
           <Pressable
             key={id}
             onPress={() => onNavigate(id)}
             accessibilityLabel={label}
-            style={[e.item, activo && { backgroundColor: t.navActivoFondo }]}
+            accessibilityState={{ selected: activo }}
+            style={[e.item, compacta && e.itemCompacto, activo && { backgroundColor: t.navActivoFondo }]}
           >
             <Icon size={20} color={activo ? t.navActivo : t.navInactivo} strokeWidth={activo ? 2.5 : 2} />
-            <Text style={{ fontSize: 11, marginTop: 2, color: activo ? t.navActivo : t.navInactivo, fontWeight: activo ? '700' : '500' }}>
+            <Text numberOfLines={1} style={{ fontSize: compacta ? 10 : 11, marginTop: 2, color: activo ? t.navActivo : t.navInactivo, fontWeight: activo ? '700' : '500' }}>
               {label}
             </Text>
           </Pressable>
@@ -37,11 +40,12 @@ const e = StyleSheet.create({
   nav: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
     paddingVertical: 10,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderTopWidth: 1,
   },
   item: { alignItems: 'center', borderRadius: 16, paddingHorizontal: 28, paddingVertical: 8 },
+  itemCompacto: { flex: 1, paddingHorizontal: 2 },
 });

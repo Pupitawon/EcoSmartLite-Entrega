@@ -21,4 +21,13 @@ const limiteRecuperarClave = rateLimit({
   message: { error: 'demasiadas_solicitudes' },
 });
 
-module.exports = { limiteLecturas, limiteRecuperarClave };
+// Límite específico para el escaneo y registro de depósitos de residuos (hasta 20 peticiones por minuto por IP).
+const limiteDepositos = rateLimit({
+  windowMs: 60_000,
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'demasiadas_solicitudes' },
+});
+
+module.exports = { limiteLecturas, limiteRecuperarClave, limiteDepositos };

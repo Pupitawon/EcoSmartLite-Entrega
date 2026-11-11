@@ -13,10 +13,11 @@ import RegisterScreen from './src/screens/RegisterScreen';
 import RecuperarClaveScreen from './src/screens/RecuperarClaveScreen';
 import MapaScreen from './src/screens/MapaScreen';
 import EstacionScreen from './src/screens/EstacionScreen';
+import EscanearScreen from './src/screens/EscanearScreen';
 
 export default function App() {
   const [darkMode, setDarkMode] = useState(true); // como la app de Jeremy
-  const [pantalla, setPantalla] = useState('login'); // login | registro | mapa | estacion
+  const [pantalla, setPantalla] = useState('login'); // login | registro | mapa | estacion | escanear
   const [perfil, setPerfil] = useState(null);
   const [estacion, setEstacion] = useState(null);
   const [iniciando, setIniciando] = useState(true);
@@ -66,11 +67,29 @@ export default function App() {
         <View style={{ flex: 1 }}>
           {pantalla === 'estacion' ? (
             <EstacionScreen station={estacion} darkMode={darkMode} onBack={() => setPantalla('mapa')} />
+          ) : pantalla === 'escanear' ? (
+            <EscanearScreen 
+              darkMode={darkMode} 
+              saldo={perfil.saldo_ecopoints} 
+              onDeposito={(d) => setPerfil((p) => ({ ...p, saldo_ecopoints: d.saldo_ecopoints }))} 
+            />
           ) : (
             <MapaScreen darkMode={darkMode} onViewStation={(s) => { setEstacion(s); setPantalla('estacion'); }} />
           )}
         </View>
-        <BottomNav active="mapa" darkMode={darkMode} onNavigate={(id) => (id === 'logout' ? salir() : setPantalla('mapa'))} />
+        <BottomNav 
+          active={pantalla === 'escanear' ? 'escanear' : 'mapa'} 
+          darkMode={darkMode} 
+          onNavigate={(id) => {
+            if (id === 'logout') {
+              salir();
+            } else if (id === 'escanear') {
+              setPantalla('escanear');
+            } else {
+              setPantalla('mapa');
+            }
+          }} 
+        />
       </>
     );
   }

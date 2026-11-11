@@ -10,6 +10,7 @@ const usuarioRoutes = require('./src/routes/usuarioRoutes');
 const lecturaRoutes = require('./src/routes/lecturaRoutes');
 const streamRoutes = require('./src/routes/streamRoutes');
 const reporteRoutes = require('./src/routes/reporteRoutes');
+const depositoRoutes = require('./src/routes/depositoRoutes'); // <-- 1. Importa las rutas de depósitos
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -30,6 +31,7 @@ app.use('/api/usuarios', usuarioRoutes);
 app.use('/api/lecturas', lecturaRoutes);
 app.use('/api/stream', streamRoutes);
 app.use('/api/reportes', reporteRoutes);
+app.use('/api/depositos', depositoRoutes); // <-- 2. Registra la ruta base para los depósitos
 
 // Panel web de sensores (mismo servidor: http://localhost:5000/panel)
 app.get('/panel', (req, res) => res.sendFile(path.join(__dirname, 'public', 'panel.html')));
@@ -62,6 +64,5 @@ if (require.main === module) {
     console.log(` Servidor Backend ejecutándose en el puerto ${PORT}`);
   });
 }
-
 
 module.exports = app;

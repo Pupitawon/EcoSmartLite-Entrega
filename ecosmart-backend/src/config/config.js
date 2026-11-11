@@ -23,6 +23,13 @@ const config = {
     .map((x) => x.trim())
     .filter(Boolean),
 
+  // Administradores (equipo de Innova Recicla): UIDs de Firebase separados por coma.
+  // Ven el panel de administración en la app y pueden cambiar el estado de los reportes.
+  adminUids: (process.env.ADMIN_UIDS || '')
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean),
+
   // Límite de lecturas por minuto y por IP.
   rateLimitPorMinuto: num(process.env.RATE_LIMIT_POR_MINUTO, 600),
 };

@@ -26,6 +26,11 @@ async function getJSON(ruta) {
 
 export const getContenedores = () => getJSON('/api/contenedores');
 
+// Panel de administración (lectura pública).
+export const getConfig = () => getJSON('/api/config');
+export const getAlertas = () => getJSON('/api/alertas');
+export const getReportes = () => getJSON('/api/reportes');
+
 // Llamadas que exigen sesión: agregan el token de Firebase.
 export async function llamar(ruta, opciones = {}) {
   if (!auth?.currentUser) throw new Error('Debes iniciar sesión.');
@@ -46,4 +51,18 @@ export async function llamarPublico(ruta, opciones = {}) {
   });
   const datos = await res.json().catch(() => ({}));
   return { status: res.status, datos };
+}
+
+/** Cambia el estado de revisión de un reporte ciudadano. Solo administradores (ADMIN_UIDS en el backend). */
+export async function actualizarReporte(id, estado_revision) {
+  const { status, datos } = await llamar(`/api/reportes/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ estado_revision }),
+  });
+  if (status === 200) return datos.reporte;
+  throw new Error(
+    status === 403 ? 'Tu cuenta no es de administrador.'
+      : status === 404 ? 'El reporte ya no existe.'
+      : `El servidor respondió ${status}.`
+  );
 }

@@ -1,6 +1,6 @@
 # EcoSmart · Backend
 
-Node.js 22+ · Express 5 · PostgreSQL (Supabase). Recibe las lecturas de llenado de los contenedores, aplica la regla de alerta y avisa en vivo al panel de la app.
+Node.js 22+ · Express 5 · PostgreSQL (Supabase). Recibe las lecturas de llenado de los contenedores, aplica la regla de alerta y avisa en vivo a la app.
 
 ## Puesta en marcha
 
@@ -19,9 +19,17 @@ cp .env.example .env        # completa DATABASE_URL e INGEST_API_KEY
 3. En `.env` define `FIREBASE_PROJECT_ID` (el Project ID de tu proyecto Firebase).
 4. `npm run dev` (o `npm start`) → http://localhost:5000
 
-## Panel web
+## Panel de administración (en la app móvil)
 
-Con el backend corriendo, abre **http://localhost:5000/panel**: contenedores con su último % de llenado, señal "Sin reporte", alertas ≥ 80 % sin duplicados y actualización automática. Las órdenes de trabajo (pestaña Actividades) aún no tienen tabla en la base y se guardan solo en el navegador. Si abres el archivo desde otro servidor, agrega `?api=http://localhost:5000`.
+Ya no hay panel web: la administración está en `ecosmart-mobile-rn`. Al iniciar sesión con una cuenta de administrador, la app muestra Contenedores, Alertas, Reportes ciudadanos, Órdenes de trabajo e Indicadores, y se actualiza sola cada 15 s.
+
+**Quién es administrador:** las cuentas de Firebase cuyo UID está en `ADMIN_UIDS` (en el `.env`, separados por coma). `GET /api/usuarios/me` devuelve `es_admin: true` para ellas, aunque no tengan perfil de ciudadano. El UID se copia desde Firebase → Authentication → Usuarios.
+
+```env
+ADMIN_UIDS=AbCdEf123...,OtroUid456...
+```
+
+Las órdenes de trabajo aún no tienen tabla en la base: se guardan en el teléfono del administrador.
 
 ## Enviar una lectura (ESP32 / gateway / simulación)
 
@@ -48,7 +56,7 @@ Content-Type: application/json
 
 La ruta antigua `PUT /api/contenedores/:id/nivel` (body `{ "porcentaje_llenado": 82 }`) sigue funcionando y usa **la misma lógica**, pero ahora también exige credencial.
 
-Otras rutas (lectura, públicas): `GET /api/contenedores`, `GET /api/alertas?estado=pendiente|resuelta|duplicada`, `GET /api/alertas/pendientes`, `GET /api/config`, y `GET /api/stream` (Server-Sent Events; el panel lo usa para actualizarse solo).
+Otras rutas (lectura, públicas): `GET /api/contenedores`, `GET /api/alertas?estado=pendiente|resuelta|duplicada`, `GET /api/alertas/pendientes`, `GET /api/config`, y `GET /api/stream` (Server-Sent Events).
 
 ## Registro de usuarios (Firebase)
 
@@ -56,9 +64,9 @@ La app crea la cuenta en Firebase y luego llama al backend con el ID token (`Aut
 
 - `POST /api/usuarios/registro` con `{ "rut": "12345678-5", "nombre_completo": "Ana Pérez", "recibe_notificaciones": true }` → 201 (creado) / 200 (ya existía) / 409 RUT en uso / 422 datos inválidos / 401 token inválido.
 - `GET /api/usuarios/me` → perfil del usuario autenticado (404 si aún no se registró).
-- `POST /api/reportes` con `{ "id_contenedor": 102, "tipo_anomalia": "danado" | "residuos_incorrectos" | "otro", "descripcion": "opcional, máx. 500" }` → 201 / 404 (`perfil_no_encontrado` o `contenedor_no_existe`) / 422 / 401. Se avisa en vivo al panel (`event: reporte` en `/api/stream`).
+- `POST /api/reportes` con `{ "id_contenedor": 102, "tipo_anomalia": "danado" | "residuos_incorrectos" | "otro", "descripcion": "opcional, máx. 500" }` → 201 / 404 (`perfil_no_encontrado` o `contenedor_no_existe`) / 422 / 401. Se avisa en vivo por `/api/stream` (`event: reporte`).
 
-El panel lee `GET /api/reportes?estado=pendiente|en_revision|resuelto|descartado` (sin nombre, RUT ni correo de quien reporta) y cambia el estado con `PATCH /api/reportes/:id` `{ "estado_revision": "resuelto" }`.
+El administrador lee `GET /api/reportes?estado=pendiente|en_revision|resuelto|descartado` (sin nombre, RUT ni correo de quien reporta) y cambia el estado con `PATCH /api/reportes/:id` `{ "estado_revision": "resuelto" }`. El `PATCH` exige token de Firebase de una cuenta en `ADMIN_UIDS` → 401 sin token, 403 si no es administrador.
 
 El UID (`id_auth`) y el correo salen del token verificado, nunca del cuerpo; el saldo de EcoPoints parte en 0.
 
@@ -89,4 +97,4 @@ npm test
 ## Pendientes de seguridad (fuera de esta entrega)
 
 - `POST /api/usuarios/deposito` no tiene autenticación y toma `ecopoints_otorgados` del cliente: cualquiera puede abonar puntos a cualquier usuario.
-- Las rutas `GET` son públicas y el login de la app móvil es simulado (el rol "Administrador" se elige con un botón). El panel no está protegido: cualquiera que conozca la URL puede cambiar el estado de un reporte con `PATCH /api/reportes/:id`.
+- Las rutas `GET` (contenedores, alertas, reportes) siguen siendo públicas, aunque los reportes no incluyen datos personales.

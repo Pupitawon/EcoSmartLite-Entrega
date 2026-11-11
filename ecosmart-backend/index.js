@@ -1,4 +1,3 @@
-const path = require('path');
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
@@ -31,10 +30,7 @@ app.use('/api/lecturas', lecturaRoutes);
 app.use('/api/stream', streamRoutes);
 app.use('/api/reportes', reporteRoutes);
 
-// Panel web de sensores (mismo servidor: http://localhost:5000/panel)
-app.get('/panel', (req, res) => res.sendFile(path.join(__dirname, 'public', 'panel.html')));
-
-// Parámetros que el panel necesita para interpretar los datos
+// Parámetros que la app (mapa y panel de administración) necesita para interpretar los datos
 app.get('/api/config', (req, res) => {
   res.json({ umbral_alerta: config.umbralAlerta, sin_reporte_horas: config.sinReporteHoras });
 });

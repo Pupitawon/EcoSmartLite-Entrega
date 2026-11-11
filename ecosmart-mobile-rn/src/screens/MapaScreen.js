@@ -26,7 +26,7 @@ export default function MapaScreen({ darkMode, onViewStation }) {
   const t = temaDe(darkMode);
   const { contenedores, cargando, error, recargar } = useContenedores();
   const [seleccionadoId, setSeleccionadoId] = useState(null);
-  const { posicion, estado: estadoUbicacion, reintentar } = useUbicacion();
+  const { posicion, estado: estadoUbicacion, detalle: detalleUbicacion, reintentar } = useUbicacion();
   const [centrar, setCentrar] = useState(0); // cada toque al botón lleva el mapa al usuario
   const irAMiUbicacion = () => (posicion ? setCentrar((n) => n + 1) : reintentar());
 
@@ -64,6 +64,14 @@ export default function MapaScreen({ darkMode, onViewStation }) {
           <View style={[e.banner, { backgroundColor: t.superficie }]}>
             <Text style={{ color: t.textoSuave, fontSize: 12 }}>
               Activa el permiso de ubicación para ver dónde estás en el mapa.
+            </Text>
+          </View>
+        )}
+
+        {!error && estadoUbicacion === 'error' && (
+          <View style={[e.banner, { backgroundColor: t.superficie }]}>
+            <Text style={{ color: t.textoSuave, fontSize: 12 }}>
+              No se pudo obtener tu ubicación{detalleUbicacion ? `: ${detalleUbicacion}` : '.'}
             </Text>
           </View>
         )}

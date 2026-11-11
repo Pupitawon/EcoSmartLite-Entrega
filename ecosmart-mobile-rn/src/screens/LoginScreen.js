@@ -8,7 +8,7 @@ import { temaDe } from '../tema';
 const logoClaro = require('../../assets/logos/logo-claro.png');
 const logoOscuro = require('../../assets/logos/logo-oscuro.png');
 
-export default function LoginScreen({ darkMode, onLogin, onGoToRegister }) {
+export default function LoginScreen({ darkMode, onLogin, onGoToRegister, onGoToRecuperar }) {
   const t = temaDe(darkMode);
   const [correo, setCorreo] = useState('');
   const [clave, setClave] = useState('');
@@ -71,6 +71,9 @@ export default function LoginScreen({ darkMode, onLogin, onGoToRegister }) {
 
         {!!error && <Text style={{ color: t.error, fontSize: 12, fontWeight: '500', marginBottom: 8 }}>{error}</Text>}
 
+        <Pressable onPress={onGoToRecuperar} style={{ alignSelf: 'flex-end', marginBottom: 12 }}>
+          <Text style={{ fontSize: 12, fontWeight: '600', color: '#10b981' }}>¿Olvidaste tu contraseña?</Text>
+        </Pressable>
         <Pressable
           onPress={enviar}
           disabled={cargando}

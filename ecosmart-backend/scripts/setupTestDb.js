@@ -19,6 +19,7 @@ const archivos = [
   path.join(__dirname, '..', 'sql', '01_migracion_lecturas.sql'),
   path.join(__dirname, '..', 'sql', '02_migracion_usuarios.sql'),
   path.join(__dirname, '..', 'sql', '03_migracion_reportes.sql'),
+  path.join(__dirname, '..', 'sql', '05_ordenes_trabajo.sql'),
   path.join(__dirname, '..', 'test', 'db', '10_seed.sql'),
 ];
 

@@ -1,4 +1,5 @@
 const { z } = require('zod');
+const { esAdmin } = require('../middleware/adminAuth');
 const pool = require('../config/db');
 const config = require('../config/config');
 
@@ -69,9 +70,14 @@ const registrarUsuario = async (req, res) => {
 // Perfil del usuario autenticado (404 si se creó en Firebase pero aún no completó el registro).
 const miPerfil = async (req, res) => {
   try {
+    const admin = esAdmin(req.user.uid);
     const r = await pool.query(`SELECT ${COLUMNAS} FROM usuario WHERE id_auth = $1`, [req.user.uid]);
-    if (!r.rows[0]) return res.status(404).json({ error: 'perfil_no_encontrado' });
-    res.json({ usuario: r.rows[0] });
+    if (!r.rows[0]) {
+      // Un administrador puede no tener perfil de ciudadano (RUT, EcoPoints): igual puede entrar.
+      if (admin) return res.json({ usuario: { nombre_completo: 'Administrador', correo: req.user.email, es_admin: true } });
+      return res.status(404).json({ error: 'perfil_no_encontrado' });
+    }
+    res.json({ usuario: { ...r.rows[0], es_admin: admin } });
   } catch (err) {
     console.error('Error al leer perfil:', err.message);
     res.status(500).json({ error: 'error_interno' });

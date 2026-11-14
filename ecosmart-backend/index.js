@@ -9,6 +9,7 @@ const usuarioRoutes = require('./src/routes/usuarioRoutes');
 const lecturaRoutes = require('./src/routes/lecturaRoutes');
 const streamRoutes = require('./src/routes/streamRoutes');
 const reporteRoutes = require('./src/routes/reporteRoutes');
+const depositoRoutes = require('./src/routes/depositoRoutes'); // <-- 1. Importa las rutas de depósitos
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -29,6 +30,7 @@ app.use('/api/usuarios', usuarioRoutes);
 app.use('/api/lecturas', lecturaRoutes);
 app.use('/api/stream', streamRoutes);
 app.use('/api/reportes', reporteRoutes);
+app.use('/api/depositos', depositoRoutes); // <-- 2. Registra la ruta base para los depósitos
 
 // Parámetros que la app (mapa y panel de administración) necesita para interpretar los datos
 app.get('/api/config', (req, res) => {
@@ -58,6 +60,5 @@ if (require.main === module) {
     console.log(` Servidor Backend ejecutándose en el puerto ${PORT}`);
   });
 }
-
 
 module.exports = app;

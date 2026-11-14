@@ -1,5 +1,5 @@
 //MapaScreen.js
-import DebugUbicacion from '../components/DebugUbicacion';
+
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LocateFixed, MapPin, Recycle, RefreshCw, X } from 'lucide-react-native';
@@ -52,12 +52,11 @@ export default function MapaScreen({ darkMode, onViewStation }) {
 
       <View style={[e.mapa, { borderColor: t.borde }]}>
         <MapaView pins={pins} darkMode={darkMode} seleccionado={seleccionado} onSelect={(p) => setSeleccionadoId(p.id_contenedor)} posicion={posicion} centrar={centrar} />
-        <DebugUbicacion estado={estadoUbicacion} detalle={detalleUbicacion} />
+
         <Pressable
           onPress={irAMiUbicacion}
           accessibilityLabel="Centrar en mi ubicación"
           style={[e.botonUbicacion, { backgroundColor: t.superficie, borderColor: t.borde }]}
-          
         >
           <LocateFixed size={20} color={posicion ? '#3b82f6' : t.textoSuave} />
         </Pressable>

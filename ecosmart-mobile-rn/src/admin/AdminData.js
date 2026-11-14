@@ -1,20 +1,27 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { actualizarReporte, getAlertas, getConfig, getContenedores, getReportes } from '../services/api';
-import { COLUMNAS_OT, ESTADO_REPORTE, criterios, material, ubicacion } from './utils';
+import {
+  actualizarReporte,
+  avanzarOrden as apiAvanzarOrden,
+  crearOrden as apiCrearOrden,
+  eliminarOrden as apiEliminarOrden,
+  getAlertas,
+  getConfig,
+  getContenedores,
+  getOrdenes,
+  getReportes,
+} from '../services/api';
+import { ESTADO_REPORTE, criterios, material, ubicacion } from './utils';
 import AdminHoja from './AdminHoja';
 
 /**
  * Datos del panel de administración (reemplaza al panel web del backend):
- * contenedores, alertas y reportes ciudadanos del backend, y órdenes de trabajo.
+ * contenedores, alertas, reportes ciudadanos y órdenes de trabajo, todo desde el backend.
  * Se vuelven a consultar solos cada 15 s (y al deslizar hacia abajo en cada pantalla).
- *
- * Las órdenes de trabajo todavía no tienen tabla en la base: se guardan en el teléfono (AsyncStorage).
+ * Las órdenes de trabajo (tabla orden_trabajo) las comparten todos los administradores.
  */
 const AdminDataContext = createContext(null);
 const CADA_MS = 15000;
-const CLAVE_OT = 'ecosmart_ots';
 const CONFIG_POR_DEFECTO = { umbral_alerta: 80, sin_reporte_horas: 6 };
 
 export function useAdminData() {
@@ -33,14 +40,12 @@ export function AdminDataProvider({ children, darkMode, onIrA }) {
   const [error, setError] = useState(null);
   const [actualizado, setActualizado] = useState(null);
   const [ahora, setAhora] = useState(() => Date.now());
-  const [ordenes, setOrdenes] = useState([]);
-  const [secuencia, setSecuencia] = useState(1000);
+  const [ordenesApi, setOrdenes] = useState([]);
   const [hoja, setHoja] = useState(null); // { tipo: 'detalle' | 'orden', id, tipoReporte }
   const [toast, setToast] = useState(null);
   const montado = useRef(true);
   const idsReportes = useRef(null); // para avisar cuando llega un reporte nuevo
   const toastTimer = useRef(null);
-  const ordenesLeidas = useRef(false);
 
   const avisar = useCallback((msg) => {
     setToast(msg);
@@ -51,16 +56,18 @@ export function AdminDataProvider({ children, darkMode, onIrA }) {
   const cargar = useCallback(async () => {
     setCargando(true);
     try {
-      const [cfg, cont, alr, rep] = await Promise.all([
+      const [cfg, cont, alr, rep, ots] = await Promise.all([
         getConfig().catch(() => null), // sin config se usan los valores por defecto
         getContenedores(),
         getAlertas(),
         getReportes().catch(() => null), // si falla, el resto del panel sigue funcionando
+        getOrdenes().catch(() => null), // ídem
       ]);
       if (!montado.current) return;
       if (cfg) setConfig(cfg);
       setContenedores([...cont].sort((a, b) => a.id_contenedor - b.id_contenedor));
       setAlertas(alr);
+      if (ots) setOrdenes(ots);
       if (rep) {
         const nuevos = idsReportes.current ? rep.filter((r) => !idsReportes.current.has(r.id_reporte)) : [];
         idsReportes.current = new Set(rep.map((r) => r.id_reporte));
@@ -92,27 +99,13 @@ export function AdminDataProvider({ children, darkMode, onIrA }) {
     };
   }, [cargar]);
 
-  // Órdenes de trabajo guardadas en el teléfono.
-  useEffect(() => {
-    AsyncStorage.getItem(CLAVE_OT)
-      .then((raw) => {
-        if (!raw) return;
-        const d = JSON.parse(raw);
-        if (Array.isArray(d.ordenes)) setOrdenes(d.ordenes);
-        if (Number.isFinite(d.secuencia)) setSecuencia(d.secuencia);
-      })
-      .catch(() => {})
-      .finally(() => {
-        ordenesLeidas.current = true;
-      });
-  }, []);
-  const guardar = useCallback((lista, sec) => {
-    if (!ordenesLeidas.current) return; // no pisar lo guardado antes de leerlo
-    AsyncStorage.setItem(CLAVE_OT, JSON.stringify({ ordenes: lista, secuencia: sec })).catch(() => {});
-  }, []);
-
   const cr = useMemo(() => criterios(config, ahora), [config, ahora]);
   const porId = useMemo(() => Object.fromEntries(contenedores.map((c) => [c.id_contenedor, c])), [contenedores]);
+  // El lugar se arma con los datos actuales del contenedor (el backend guarda solo su id).
+  const ordenes = useMemo(
+    () => ordenesApi.map((o) => ({ ...o, lugar: `${material(porId[o.contenedor])} · ${ubicacion(porId[o.contenedor])}` })),
+    [ordenesApi, porId]
+  );
 
   const revisarReporte = useCallback(
     async (id, estado) => {
@@ -128,53 +121,49 @@ export function AdminDataProvider({ children, darkMode, onIrA }) {
   );
 
   const crearOrden = useCallback(
-    ({ id_contenedor, tipo, prioridad, tecnico }) => {
-      const c = porId[id_contenedor];
-      const n = secuencia + 1;
-      const fecha = new Date().toISOString();
-      const orden = {
-        id: `OT-${n}`,
-        tipo,
-        contenedor: id_contenedor,
-        lugar: `${material(c)} · ${ubicacion(c)}`,
-        prioridad,
-        tecnico,
-        estado: COLUMNAS_OT[0],
-        creada: fecha,
-        actualizada: fecha,
-      };
-      const lista = [orden, ...ordenes];
-      setSecuencia(n);
-      setOrdenes(lista);
-      guardar(lista, n);
-      setHoja(null);
-      avisar(`${orden.id} creada en Pendiente`);
-      onIrA?.('ordenes');
+    async ({ id_contenedor, tipo, prioridad, tecnico }) => {
+      try {
+        const orden = await apiCrearOrden({ id_contenedor, tipo, prioridad, tecnico });
+        setOrdenes((prev) => [orden, ...prev.filter((x) => x.id_orden !== orden.id_orden)]);
+        setHoja(null);
+        avisar(`${orden.id} creada en ${orden.estado}`);
+        onIrA?.('ordenes');
+      } catch (e) {
+        avisar(`No se pudo crear la orden: ${e.message}`);
+      }
     },
-    [porId, secuencia, ordenes, guardar, avisar, onIrA]
+    [avisar, onIrA]
   );
 
   const avanzarOrden = useCallback(
-    (id) => {
-      const o = ordenes.find((x) => x.id === id);
-      const sig = o && COLUMNAS_OT[COLUMNAS_OT.indexOf(o.estado) + 1];
-      if (!sig) return;
-      const lista = ordenes.map((x) => (x.id === id ? { ...x, estado: sig, actualizada: new Date().toISOString() } : x));
-      setOrdenes(lista);
-      guardar(lista, secuencia);
-      avisar(`${id} → ${sig}`);
+    async (id) => {
+      const o = ordenesApi.find((x) => x.id === id);
+      if (!o) return;
+      try {
+        const nueva = await apiAvanzarOrden(o.id_orden);
+        setOrdenes((prev) => prev.map((x) => (x.id_orden === nueva.id_orden ? nueva : x)));
+        avisar(`${id} → ${nueva.estado}`);
+      } catch (e) {
+        avisar(`No se pudo avanzar ${id}: ${e.message}`);
+        cargar(); // otro administrador pudo cambiarla: se trae el estado real
+      }
     },
-    [ordenes, secuencia, guardar, avisar]
+    [ordenesApi, avisar, cargar]
   );
 
   const eliminarOrden = useCallback(
-    (id) => {
-      const lista = ordenes.filter((x) => x.id !== id);
-      setOrdenes(lista);
-      guardar(lista, secuencia);
-      avisar(`${id} eliminada`);
+    async (id) => {
+      const o = ordenesApi.find((x) => x.id === id);
+      if (!o) return;
+      try {
+        await apiEliminarOrden(o.id_orden);
+        setOrdenes((prev) => prev.filter((x) => x.id_orden !== o.id_orden));
+        avisar(`${id} eliminada`);
+      } catch (e) {
+        avisar(`No se pudo eliminar ${id}: ${e.message}`);
+      }
     },
-    [ordenes, secuencia, guardar, avisar]
+    [ordenesApi, avisar]
   );
 
   const valor = {

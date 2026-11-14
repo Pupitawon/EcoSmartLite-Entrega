@@ -1,4 +1,4 @@
-import { Text, TextInput, View } from 'react-native';
+import { Platform, Text, TextInput, View } from 'react-native';
 import { temaDe } from '../tema';
 
 export default function Campo({ darkMode, Icono, etiqueta, ...props }) {
@@ -21,7 +21,7 @@ export default function Campo({ darkMode, Icono, etiqueta, ...props }) {
         <TextInput
           {...props}
           placeholderTextColor="#78716c"
-          style={{ flex: 1, paddingHorizontal: 8, paddingVertical: 11, fontSize: 14, color: t.texto, outlineStyle: 'none' }}
+          style={{ flex: 1, paddingHorizontal: 8, paddingVertical: 11, fontSize: Platform.OS === 'web' ? 16 : 14, color: t.texto, outlineStyle: 'none' }}
         />
       </View>
     </View>

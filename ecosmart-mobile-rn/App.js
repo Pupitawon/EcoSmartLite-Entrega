@@ -42,6 +42,36 @@ export default function App() {
     return baja;
   }, []);
 
+  useEffect(() => {
+    if (!auth) { setIniciando(false); return undefined; }
+    let primera = true;
+    const baja = onAuthStateChanged(auth, async (usuario) => {
+      if (!primera) return;
+      primera = false;
+      baja?.();
+      if (usuario) {
+        try {
+          const p = await obtenerPerfil();
+          if (p) { setPerfil(p); setPantalla('mapa'); }
+        } catch { /* sin conexión: queda en el login */ }
+      }
+      setIniciando(false);
+    });
+    return baja;
+  }, []);
+
+  // Fija el viewport en el navegador para que el celular no amplíe la página
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    let meta = document.querySelector('meta[name="viewport"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.setAttribute('name', 'viewport');
+      document.head.appendChild(meta);
+    }
+    meta.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover');
+  }, []);
+
   const entrar = (p) => { setPerfil(p); setPantalla('mapa'); };
   const salir = () => { cerrarSesion().catch(() => {}); setPerfil(null); setEstacion(null); setPantalla('login'); };
 

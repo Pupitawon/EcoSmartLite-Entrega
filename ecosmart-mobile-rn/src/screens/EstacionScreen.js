@@ -181,7 +181,7 @@ const e = StyleSheet.create({
   opcion: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 8, padding: 8, marginBottom: 6 },
   radio: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
   radioInterno: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#f59e0b' },
-  texto: { borderWidth: 1, borderRadius: 12, padding: 10, fontSize: 12, height: 80, textAlignVertical: 'top', marginTop: 4 },
+    texto: { borderWidth: 1, borderRadius: 12, padding: 10, fontSize: Platform.OS === 'web' ? 16 : 12, height: 80, textAlignVertical: 'top', marginTop: 4 },
   enviar: { borderRadius: 12, paddingVertical: 11, alignItems: 'center', marginTop: 10 },
   enviarTxt: { color: '#fff', fontSize: 12, fontWeight: '700' },
 });

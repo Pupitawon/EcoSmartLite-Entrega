@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Crypto from 'expo-crypto';
 import { AlertTriangle, CheckCircle2, Keyboard, Minus, Plus, QrCode, Recycle, X, XCircle } from 'lucide-react-native';
@@ -390,5 +390,5 @@ const e = StyleSheet.create({
   paso: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   boton: { borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginTop: 4 },
   botonTxt: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, fontSize: 14, letterSpacing: 1 },
+  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, fontSize: Platform.OS === 'web' ? 16 : 14, letterSpacing: 1 },
 });

@@ -77,6 +77,8 @@ export default function RecuperarClaveScreen({ darkMode, onBack }) {
               value={rut}
               onChangeText={(v) => setRut(formatearRut(v))}
               autoCapitalize="characters"
+              onSubmitEditing={enviar}
+              returnKeyType="send"
               placeholder="12345678-5"
             />
 

@@ -66,6 +66,8 @@ export default function LoginScreen({ darkMode, onLogin, onGoToRegister, onGoToR
           value={clave}
           onChangeText={setClave}
           secureTextEntry
+          onSubmitEditing={enviar}
+          returnKeyType="go"
           placeholder="••••••••"
         />
 

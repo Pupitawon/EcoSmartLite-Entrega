@@ -51,7 +51,7 @@ export default function RegisterScreen({ darkMode, onRegistered, onBack }) {
         <Campo darkMode={darkMode} Icono={Mail} etiqueta="Correo" value={f.correo} onChangeText={set('correo')} autoCapitalize="none" keyboardType="email-address" autoComplete="email" placeholder="tucorreo@ejemplo.cl" />
         <Campo darkMode={darkMode} Icono={Lock} etiqueta="Contraseña" value={f.clave} onChangeText={set('clave')} secureTextEntry placeholder="Mínimo 8 caracteres" />
         <RequisitosClave clave={f.clave} darkMode={darkMode} />
-        <Campo darkMode={darkMode} Icono={Lock} etiqueta="Repite la contraseña" value={f.clave2} onChangeText={set('clave2')} secureTextEntry placeholder="••••••••" />
+        <Campo darkMode={darkMode} Icono={Lock} etiqueta="Repite la contraseña" value={f.clave2} onChangeText={set('clave2')} secureTextEntry onSubmitEditing={enviar} returnKeyType="go" placeholder="••••••••" />
 
         {!!error && <Text style={{ color: t.error, fontSize: 12, fontWeight: '500', marginBottom: 8 }}>{error}</Text>}
 

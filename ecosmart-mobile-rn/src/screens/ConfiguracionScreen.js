@@ -87,7 +87,7 @@ export default function ConfiguracionScreen({ perfil, darkMode, toggleDarkMode, 
             <Campo darkMode={darkMode} Icono={Lock} etiqueta="Contraseña actual" value={f.actual} onChangeText={set('actual')} secureTextEntry placeholder="••••••••" />
             <Campo darkMode={darkMode} Icono={Lock} etiqueta="Contraseña nueva" value={f.nueva} onChangeText={set('nueva')} secureTextEntry placeholder="Mínimo 8 caracteres" />
             <RequisitosClave clave={f.nueva} darkMode={darkMode} />
-            <Campo darkMode={darkMode} Icono={Lock} etiqueta="Repite la contraseña nueva" value={f.repetir} onChangeText={set('repetir')} secureTextEntry placeholder="••••••••" />
+            <Campo darkMode={darkMode} Icono={Lock} etiqueta="Repite la contraseña nueva" value={f.repetir} onChangeText={set('repetir')} secureTextEntry onSubmitEditing={guardarClave} returnKeyType="done" placeholder="••••••••" />
             {mensaje ? (
               <Text style={{ color: mensaje.ok ? t.acentoFuerte : t.error, fontSize: 13, marginBottom: 10 }}>{mensaje.texto}</Text>
             ) : null}

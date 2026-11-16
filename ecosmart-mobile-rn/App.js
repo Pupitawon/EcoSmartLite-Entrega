@@ -18,6 +18,7 @@ import EscanearScreen from './src/screens/EscanearScreen';
 import PerfilScreen from './src/screens/PerfilScreen';
 import ConfiguracionScreen from './src/screens/ConfiguracionScreen';
 import LogrosScreen from './src/screens/LogrosScreen';
+import RankingScreen from './src/screens/RankingScreen';
 import DesafiosScreen from './src/screens/DesafiosScreen';
 
 export default function App() {
@@ -87,6 +88,8 @@ export default function App() {
             />
           ) : pantalla === 'desafios' ? (
             <DesafiosScreen perfil={perfil} darkMode={darkMode} />
+          ) : pantalla === 'ranking' ? (
+            <RankingScreen perfil={perfil} darkMode={darkMode} />
           ) : pantalla === 'perfil' ? (
             <PerfilScreen perfil={perfil} darkMode={darkMode} onVolver={() => setPantalla('mapa')} onConfiguracion={() => setPantalla('configuracion')} onVerLogros={() => setPantalla('logros')} />
           ) : pantalla === 'logros' ? (
@@ -100,10 +103,10 @@ export default function App() {
         {/* El perfil y la configuración ocupan toda la pantalla (como en Duolingo): sin encabezado ni barra inferior. */}
         {!['perfil', 'configuracion', 'logros'].includes(pantalla) ? (
         <BottomNav 
-          active={pantalla === 'escanear' || pantalla === 'desafios' ? pantalla : 'mapa'} 
+          active={['escanear', 'desafios', 'ranking'].includes(pantalla) ? pantalla : 'mapa'} 
           darkMode={darkMode} 
           onNavigate={(id) => {
-            setPantalla(id === 'escanear' || id === 'desafios' ? id : 'mapa');
+            setPantalla(['escanear', 'desafios', 'ranking'].includes(id) ? id : 'mapa');
           }} 
         />
         ) : null}

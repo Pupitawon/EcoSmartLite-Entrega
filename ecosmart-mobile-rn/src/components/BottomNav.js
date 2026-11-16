@@ -1,11 +1,12 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { MapPin, QrCode, Target } from 'lucide-react-native';
+import { MapPin, QrCode, Target, Trophy } from 'lucide-react-native';
 import { temaDe } from '../tema';
 
 const ITEMS = [
   { id: 'mapa', icon: MapPin, label: 'Mapa' },
   { id: 'escanear', icon: QrCode, label: 'Escanear' },
   { id: 'desafios', icon: Target, label: 'Desafíos' },
+  { id: 'ranking', icon: Trophy, label: 'Ranking' },
 ];
 
 export default function BottomNav({ active, darkMode, onNavigate }) {
@@ -36,11 +37,11 @@ const e = StyleSheet.create({
   nav: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
     paddingVertical: 10,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderTopWidth: 1,
   },
-  item: { alignItems: 'center', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 8 },
+  item: { alignItems: 'center', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8 },
 });

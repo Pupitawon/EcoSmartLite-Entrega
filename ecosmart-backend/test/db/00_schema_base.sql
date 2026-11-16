@@ -91,6 +91,7 @@ CREATE TABLE Deposito_Residuo (
     ecopoints_otorgados INT NOT NULL,
     fecha_escaneo_offline TIMESTAMP NOT NULL,
     fecha_sincronizacion TIMESTAMP,
+    cantidad_premiada INT, -- botellas premiadas (columna añadida en Supabase; la usa resumenDiario)
     PRIMARY KEY (id_deposito),
     CONSTRAINT unique_codigo_qr UNIQUE (codigo_qr_escaneado),
     CONSTRAINT fk_deposito_usuario FOREIGN KEY (id_usuario) REFERENCES Usuario(id_usuario),

@@ -1,4 +1,6 @@
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import {
+  createUserWithEmailAndPassword, EmailAuthProvider, reauthenticateWithCredential, signInWithEmailAndPassword, signOut, updatePassword,
+} from 'firebase/auth';
 import { auth } from '../firebase';
 import { llamar, llamarPublico } from './api';
 
@@ -6,7 +8,8 @@ const MENSAJES = {
   'auth/email-already-in-use': 'Ese correo ya está registrado. Inicia sesión.',
   'auth/invalid-email': 'El correo no es válido.',
   'auth/missing-email': 'Ingresa tu correo.',
-  'auth/weak-password': 'La contraseña debe tener al menos 6 caracteres.',
+  'auth/weak-password': 'La contraseña es muy débil. Usa una más larga o más variada.',
+  'auth/password-does-not-meet-requirements': 'La contraseña no cumple los requisitos de seguridad.',
   'auth/invalid-credential': 'Correo o contraseña incorrectos.',
   'auth/user-not-found': 'Correo o contraseña incorrectos.',
   'auth/wrong-password': 'Correo o contraseña incorrectos.',
@@ -86,3 +89,25 @@ export async function enviarReporte({ id_contenedor, tipo_anomalia, descripcion 
 }
 
 export const cerrarSesion = () => (auth ? signOut(auth) : Promise.resolve());
+
+/**
+ * Cambia la contraseña del usuario autenticado. Firebase exige una sesión reciente, así que primero se
+ * confirma la contraseña actual (reautenticación) y luego se guarda la nueva.
+ */
+export async function cambiarClave(claveActual, claveNueva) {
+  const usuario = auth?.currentUser;
+  if (!usuario?.email) throw new Error('Tu sesión expiró. Vuelve a iniciar sesión.');
+  try {
+    await reauthenticateWithCredential(usuario, EmailAuthProvider.credential(usuario.email, claveActual));
+  } catch (e) {
+    if (e?.code === 'auth/invalid-credential' || e?.code === 'auth/wrong-password') {
+      throw new Error('La contraseña actual no es correcta.');
+    }
+    throw new Error(mensajeError(e));
+  }
+  try {
+    await updatePassword(usuario, claveNueva);
+  } catch (e) {
+    throw new Error(mensajeError(e));
+  }
+}

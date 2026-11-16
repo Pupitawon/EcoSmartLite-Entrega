@@ -1,6 +1,8 @@
 const { z } = require('zod');
 const pool = require('../config/db');
 const config = require('../config/config');
+const { resumenInsignias } = require('../services/insigniaService');
+const { resumenDesafios } = require('../services/desafioService');
 
 // RUT chileno: 7-8 dígitos + dígito verificador (módulo 11). Se guarda como 12345678-K, sin puntos.
 function normalizarRut(raw) {
@@ -78,6 +80,30 @@ const miPerfil = async (req, res) => {
   }
 };
 
+// Insignias, avance y racha del usuario autenticado (pantalla Perfil de la app).
+const misInsignias = async (req, res) => {
+  try {
+    const r = await resumenInsignias(req.user.uid);
+    if (!r) return res.status(404).json({ error: 'perfil_no_encontrado' });
+    res.json({ resumen: r });
+  } catch (err) {
+    console.error('Error al leer insignias:', err.message);
+    res.status(500).json({ error: 'error_interno' });
+  }
+};
+
+// Desafíos del día y del mes del usuario autenticado (pantalla Desafíos de la app).
+const misDesafios = async (req, res) => {
+  try {
+    const r = await resumenDesafios(req.user.uid);
+    if (!r) return res.status(404).json({ error: 'perfil_no_encontrado' });
+    res.json({ desafios: r });
+  } catch (err) {
+    console.error('Error al leer desafíos:', err.message);
+    res.status(500).json({ error: 'error_interno' });
+  }
+};
+
 // ---- Recuperar contraseña: exige correo y RUT del mismo usuario ----
 const recuperarSchema = z
   .object({
@@ -128,4 +154,4 @@ const recuperarClave = async (req, res) => {
   }
 };
 
-module.exports = { registrarUsuario, miPerfil, recuperarClave, rutValido, normalizarRut };
+module.exports = { registrarUsuario, miPerfil, misInsignias, misDesafios, recuperarClave, rutValido, normalizarRut };

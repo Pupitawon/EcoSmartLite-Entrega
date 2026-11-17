@@ -920,6 +920,8 @@ function renderCiudadanos(){
 async function revisarReporte(id, estado){
   try {
     const r = await fetch(`${API}/api/reportes/${id}`, { method:"PATCH", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ estado_revision: estado }) });
+    // Cambiar el estado exige sesión de administrador (ADMIN_UIDS); el panel web no tiene login.
+    if(r.status === 401 || r.status === 403) throw new Error("solo un administrador puede hacerlo desde la app");
     if(!r.ok) throw new Error(`El servidor respondió ${r.status}`);
     const { reporte } = await r.json();
     const i = reportes.findIndex(x => x.id_reporte === id);

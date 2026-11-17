@@ -53,10 +53,6 @@ export async function iniciarSesion(correo, clave) {
 }
 
 /**
- * Envía el correo de restablecimiento de contraseña (Firebase).
- * Por seguridad no revela si el correo existe: si la cuenta no existe, también se muestra éxito.
- */
-/**
  * Pide el correo de restablecimiento de contraseña. El backend valida que correo y RUT sean de la misma cuenta.
  * Por seguridad responde siempre lo mismo, coincidan o no los datos.
  */

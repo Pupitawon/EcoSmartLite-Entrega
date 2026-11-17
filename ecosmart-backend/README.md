@@ -15,7 +15,10 @@ cp .env.example .env        # completa DATABASE_URL e INGEST_API_KEY
    - **Limpia los duplicados** que generaba el código anterior (una alerta `pendiente` por *cada* lectura ≥ 80 %): deja la más antigua por contenedor y marca las demás como `duplicada`. No borra nada.
    - Crea el índice único que impide más de una alerta `pendiente` por contenedor.
 2. **Usuarios (una vez):** pega y ejecuta también `sql/02_migracion_usuarios.sql` (id autogenerado en `usuario` e índice único sobre `id_auth`).
+   **RUT y correo únicos (una vez):** ejecuta `sql/02_usuarios_unicos.sql`.
    **Reportes ciudadanos (una vez):** ejecuta `sql/03_migracion_reportes.sql` (id autogenerado en `reporte_anomalia`, columnas `tipo_anomalia` y `fecha_revision`).
+   **Seguridad (una vez):** `sql/04_seguridad_rls.sql` activa RLS (la API REST de Supabase no expone las tablas; el backend entra con el rol `postgres`).
+   **Depósitos por QR (una vez):** `sql/05_depositos_qr.sql` crea `configuracion_sistema`, `contenedor.codigo_qr`, las columnas de `deposito_residuo` y la función `registrar_deposito` (depósito + saldo + insignias en una transacción).
 3. En `.env` define `FIREBASE_PROJECT_ID` (el Project ID de tu proyecto Firebase).
 4. `npm run dev` (o `npm start`) → http://localhost:5000
 
@@ -58,7 +61,7 @@ La app crea la cuenta en Firebase y luego llama al backend con el ID token (`Aut
 - `GET /api/usuarios/me` → perfil del usuario autenticado (404 si aún no se registró).
 - `POST /api/reportes` con `{ "id_contenedor": 102, "tipo_anomalia": "danado" | "residuos_incorrectos" | "otro", "descripcion": "opcional, máx. 500" }` → 201 / 404 (`perfil_no_encontrado` o `contenedor_no_existe`) / 422 / 401. Se avisa en vivo al panel (`event: reporte` en `/api/stream`).
 
-El panel lee `GET /api/reportes?estado=pendiente|en_revision|resuelto|descartado` (sin nombre, RUT ni correo de quien reporta) y cambia el estado con `PATCH /api/reportes/:id` `{ "estado_revision": "resuelto" }`.
+El panel lee `GET /api/reportes?estado=pendiente|en_revision|resuelto|descartado` (sin nombre, RUT ni correo de quien reporta). Cambiar el estado con `PATCH /api/reportes/:id` `{ "estado_revision": "resuelto" }` exige token de Firebase de un **administrador**: su UID debe estar en `ADMIN_UIDS` (separados por coma) → 401 sin token / 403 si no es admin.
 
 El UID (`id_auth`) y el correo salen del token verificado, nunca del cuerpo; el saldo de EcoPoints parte en 0.
 
@@ -88,5 +91,4 @@ npm test
 
 ## Pendientes de seguridad (fuera de esta entrega)
 
-- `POST /api/usuarios/deposito` no tiene autenticación y toma `ecopoints_otorgados` del cliente: cualquiera puede abonar puntos a cualquier usuario.
-- Las rutas `GET` son públicas y el login de la app móvil es simulado (el rol "Administrador" se elige con un botón). El panel no está protegido: cualquiera que conozca la URL puede cambiar el estado de un reporte con `PATCH /api/reportes/:id`.
+- Las rutas `GET` (`/api/reportes`, `/api/alertas`, `/api/stream`) siguen públicas porque el panel web no tiene login. No exponen datos personales.

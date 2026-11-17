@@ -64,6 +64,13 @@ const registrarUsuario = async (req, res) => {
     const ya = await pool.query(`SELECT ${COLUMNAS} FROM usuario WHERE id_auth = $1`, [req.user.uid]);
     return res.status(200).json({ usuario: ya.rows[0], creado: false });
   } catch (err) {
+    // Carrera: otra cuenta registró el mismo RUT (o correo) entre la verificación y el INSERT.
+    if (err.code === '23505') {
+      if (err.constraint === 'uq_usuario_correo') {
+        return res.status(409).json({ error: 'correo_en_uso', mensaje: 'Ese correo ya está registrado' });
+      }
+      return res.status(409).json({ error: 'rut_en_uso', mensaje: 'Ese RUT ya está registrado' });
+    }
     console.error('Error al registrar usuario:', err.message);
     res.status(500).json({ error: 'error_interno' });
   }

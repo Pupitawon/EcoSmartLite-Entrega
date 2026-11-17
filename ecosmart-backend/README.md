@@ -18,7 +18,8 @@ cp .env.example .env        # completa DATABASE_URL e INGEST_API_KEY
    **RUT y correo únicos (una vez):** ejecuta `sql/02_usuarios_unicos.sql`.
    **Reportes ciudadanos (una vez):** ejecuta `sql/03_migracion_reportes.sql` (id autogenerado en `reporte_anomalia`, columnas `tipo_anomalia` y `fecha_revision`).
    **Seguridad (una vez):** `sql/04_seguridad_rls.sql` activa RLS (la API REST de Supabase no expone las tablas; el backend entra con el rol `postgres`).
-   **Depósitos por QR (una vez):** `sql/05_depositos_qr.sql` crea `configuracion_sistema`, `contenedor.codigo_qr`, las columnas de `deposito_residuo` y la función `registrar_deposito` (depósito + saldo + insignias en una transacción).
+   **Órdenes de trabajo (una vez):** `sql/05_ordenes_trabajo.sql` crea la tabla `orden_trabajo`.
+   **Depósitos por QR (una vez):** `sql/06_depositos_qr.sql` crea `configuracion_sistema`, `contenedor.codigo_qr`, las columnas de `deposito_residuo` y la función `registrar_deposito` (depósito + saldo + insignias en una transacción).
 3. En `.env` define `FIREBASE_PROJECT_ID` (el Project ID de tu proyecto Firebase).
 4. `npm run dev` (o `npm start`) → http://localhost:5000
 
@@ -32,7 +33,7 @@ Ya no hay panel web: la administración está en `ecosmart-mobile-rn`. Al inicia
 ADMIN_UIDS=AbCdEf123...,OtroUid456...
 ```
 
-Las órdenes de trabajo aún no tienen tabla en la base: se guardan en el teléfono del administrador.
+Las órdenes de trabajo se guardan en la tabla `orden_trabajo` (`/api/ordenes`, solo administradores).
 
 ## Enviar una lectura (ESP32 / gateway / simulación)
 
@@ -99,6 +100,4 @@ npm test
 
 ## Pendientes de seguridad (fuera de esta entrega)
 
-- `POST /api/usuarios/deposito` no tiene autenticación y toma `ecopoints_otorgados` del cliente: cualquiera puede abonar puntos a cualquier usuario.
-- Las rutas `GET` (contenedores, alertas, reportes) siguen siendo públicas, aunque los reportes no incluyen datos personales.
-- Las rutas `GET` (`/api/reportes`, `/api/alertas`, `/api/stream`) siguen públicas porque no llevan sesión. No exponen datos personales.
+- Las rutas `GET` (contenedores, alertas, reportes, `/api/stream`) siguen siendo públicas, aunque no exponen datos personales.

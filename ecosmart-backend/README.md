@@ -15,7 +15,10 @@ cp .env.example .env        # completa DATABASE_URL e INGEST_API_KEY
    - **Limpia los duplicados** que generaba el código anterior (una alerta `pendiente` por *cada* lectura ≥ 80 %): deja la más antigua por contenedor y marca las demás como `duplicada`. No borra nada.
    - Crea el índice único que impide más de una alerta `pendiente` por contenedor.
 2. **Usuarios (una vez):** pega y ejecuta también `sql/02_migracion_usuarios.sql` (id autogenerado en `usuario` e índice único sobre `id_auth`).
+   **RUT y correo únicos (una vez):** ejecuta `sql/02_usuarios_unicos.sql`.
    **Reportes ciudadanos (una vez):** ejecuta `sql/03_migracion_reportes.sql` (id autogenerado en `reporte_anomalia`, columnas `tipo_anomalia` y `fecha_revision`).
+   **Seguridad (una vez):** `sql/04_seguridad_rls.sql` activa RLS (la API REST de Supabase no expone las tablas; el backend entra con el rol `postgres`).
+   **Depósitos por QR (una vez):** `sql/05_depositos_qr.sql` crea `configuracion_sistema`, `contenedor.codigo_qr`, las columnas de `deposito_residuo` y la función `registrar_deposito` (depósito + saldo + insignias en una transacción).
 3. En `.env` define `FIREBASE_PROJECT_ID` (el Project ID de tu proyecto Firebase).
 4. `npm run dev` (o `npm start`) → http://localhost:5000
 
@@ -98,3 +101,4 @@ npm test
 
 - `POST /api/usuarios/deposito` no tiene autenticación y toma `ecopoints_otorgados` del cliente: cualquiera puede abonar puntos a cualquier usuario.
 - Las rutas `GET` (contenedores, alertas, reportes) siguen siendo públicas, aunque los reportes no incluyen datos personales.
+- Las rutas `GET` (`/api/reportes`, `/api/alertas`, `/api/stream`) siguen públicas porque no llevan sesión. No exponen datos personales.

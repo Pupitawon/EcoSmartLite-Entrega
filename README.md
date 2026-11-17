@@ -1,11 +1,12 @@
 # EcoSmartLite
 
-- `ecosmart-backend/`: API en Node.js + Express conectada a Supabase (PostgreSQL). Detalles en [ecosmart-backend/README.md](ecosmart-backend/README.md).
-- `ecosmart-mobile/`: app en React + Vite (y Android con Capacitor) con login de Firebase. Detalles en [ecosmart-mobile/README.md](ecosmart-mobile/README.md).
+- `ecosmart-backend/`: API en Node.js + Express conectada a Supabase (PostgreSQL). Incluye el panel web en `/panel`. Detalles en [ecosmart-backend/README.md](ecosmart-backend/README.md).
+- `ecosmart-mobile-rn/`: app ciudadana en React Native con Expo (Android, iOS y navegador): mapa de contenedores, escaneo de QR, perfil, logros, desafíos y ranking. Login con Firebase.
+- `ecosmart-nodo/`: firmware del sensor ESP32 (PlatformIO). Detalles en [ecosmart-nodo/README.md](ecosmart-nodo/README.md).
 
 ## Cómo probar el proyecto (para el equipo)
 
-Requisitos: Node.js 18 o superior y Git.
+Requisitos: Node.js 22 o superior y Git. Para probar en el celular, la app **Expo Go**.
 
 ### 1. Clonar
 
@@ -20,8 +21,8 @@ Las claves de Supabase y Firebase **no están en el repositorio**. Pídele los d
 
 | Archivo | Contiene |
 |---|---|
-| `ecosmart-backend/.env` | `DATABASE_URL` de Supabase, `INGEST_API_KEY`, configuración de Firebase |
-| `ecosmart-mobile/.env` | `VITE_API_URL` (URL del backend) y las claves web de Firebase |
+| `ecosmart-backend/.env` | `DATABASE_URL` de Supabase, `INGEST_API_KEY`, configuración de Firebase, `ADMIN_UIDS` |
+| `ecosmart-mobile-rn/.env` | `EXPO_PUBLIC_API_URL` (URL del backend) y las claves web de Firebase |
 
 Las variables que lleva cada uno están en los `.env.example` de cada carpeta.
 
@@ -37,21 +38,22 @@ npm install
 npm run dev
 ```
 
-Queda en http://localhost:5000.
+Queda en http://localhost:5000 (panel web en http://localhost:5000/panel).
 
 ### 4. Levantar la app (en otra terminal)
 
 ```bash
-cd ecosmart-mobile
+cd ecosmart-mobile-rn
 npm install
-npm run dev
+npx expo start
 ```
 
-Abre la URL que muestra Vite (http://localhost:5174).
+- Presiona `w` para abrirla en el navegador.
+- Para el celular, escanea el QR que aparece en la terminal con Expo Go.
 
-### Probar en un celular Android
+### Probar en un celular
 
-Desde el celular, `localhost` no apunta a tu computador. En `ecosmart-mobile/.env` cambia `VITE_API_URL` por la IP de tu computador en la red (por ejemplo `http://192.168.1.20:5000`), con el celular conectado al mismo Wi-Fi.
+Desde el celular, `127.0.0.1` no apunta a tu computador. En `ecosmart-mobile-rn/.env` cambia `EXPO_PUBLIC_API_URL` por la IP de tu computador en la red (por ejemplo `http://192.168.1.20:5000`), con el celular conectado al mismo Wi-Fi, y reinicia `npx expo start`.
 
 ## Acceso a los paneles (opcional)
 

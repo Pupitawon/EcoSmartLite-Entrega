@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ArrowLeft, CreditCard, Lock, Mail, User } from 'lucide-react-native';
+import RequisitosClave from '../components/RequisitosClave';
+import { claveValida } from '../utils/clave';
 import Campo from '../components/Campo';
 import { mensajeError, registrar } from '../services/auth';
 import { temaDe } from '../tema';
@@ -21,7 +23,7 @@ export default function RegisterScreen({ darkMode, onRegistered, onBack }) {
 
   async function enviar() {
     if (f.nombre.trim().length < 2 || !f.rut || !f.correo.trim() || !f.clave) return setError('Completa todos los campos.');
-    if (f.clave.length < 6) return setError('La contraseña debe tener al menos 6 caracteres.');
+    if (!claveValida(f.clave)) return setError('La contraseña no cumple todos los requisitos.');
     if (f.clave !== f.clave2) return setError('Las contraseñas no coinciden.');
     setError('');
     setCargando(true);
@@ -47,8 +49,9 @@ export default function RegisterScreen({ darkMode, onRegistered, onBack }) {
         <Campo darkMode={darkMode} Icono={User} etiqueta="Nombre completo" value={f.nombre} onChangeText={set('nombre')} autoCapitalize="words" autoComplete="name" placeholder="Ana Pérez" />
         <Campo darkMode={darkMode} Icono={CreditCard} etiqueta="RUT" value={f.rut} onChangeText={set('rut')} autoCapitalize="characters" placeholder="12345678-5" />
         <Campo darkMode={darkMode} Icono={Mail} etiqueta="Correo" value={f.correo} onChangeText={set('correo')} autoCapitalize="none" keyboardType="email-address" autoComplete="email" placeholder="tucorreo@ejemplo.cl" />
-        <Campo darkMode={darkMode} Icono={Lock} etiqueta="Contraseña" value={f.clave} onChangeText={set('clave')} secureTextEntry placeholder="Mínimo 6 caracteres" />
-        <Campo darkMode={darkMode} Icono={Lock} etiqueta="Repite la contraseña" value={f.clave2} onChangeText={set('clave2')} secureTextEntry placeholder="••••••••" />
+        <Campo darkMode={darkMode} Icono={Lock} etiqueta="Contraseña" value={f.clave} onChangeText={set('clave')} secureTextEntry placeholder="Mínimo 8 caracteres" />
+        <RequisitosClave clave={f.clave} darkMode={darkMode} />
+        <Campo darkMode={darkMode} Icono={Lock} etiqueta="Repite la contraseña" value={f.clave2} onChangeText={set('clave2')} secureTextEntry onSubmitEditing={enviar} returnKeyType="go" placeholder="••••••••" />
 
         {!!error && <Text style={{ color: t.error, fontSize: 12, fontWeight: '500', marginBottom: 8 }}>{error}</Text>}
 

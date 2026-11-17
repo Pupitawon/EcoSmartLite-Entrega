@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './src/firebase';
 import { cerrarSesion, obtenerPerfil } from './src/services/auth';
+import { obtenerInsignias } from './src/services/insignias';
 import { temaDe } from './src/tema';
 import Header from './src/components/Header';
 import BottomNav from './src/components/BottomNav';
@@ -14,6 +15,12 @@ import RecuperarClaveScreen from './src/screens/RecuperarClaveScreen';
 import MapaScreen from './src/screens/MapaScreen';
 import EstacionScreen from './src/screens/EstacionScreen';
 import EscanearScreen from './src/screens/EscanearScreen';
+import PerfilScreen from './src/screens/PerfilScreen';
+import ConfiguracionScreen from './src/screens/ConfiguracionScreen';
+import LogrosScreen from './src/screens/LogrosScreen';
+import RankingScreen from './src/screens/RankingScreen';
+import DesafiosScreen from './src/screens/DesafiosScreen';
+
 import { AlertTriangle, Boxes, ChartColumn, ClipboardList, LogOut, MessageSquareWarning } from 'lucide-react-native';
 import { AdminDataProvider } from './src/admin/AdminData';
 import ContenedoresScreen from './src/screens/admin/ContenedoresScreen';
@@ -43,10 +50,11 @@ const inicioDe = (p) => (p?.es_admin ? 'contenedores' : 'mapa');
 
 export default function App() {
   const [darkMode, setDarkMode] = useState(true); // como la app de Jeremy
-  const [pantalla, setPantalla] = useState('login'); // login | registro | mapa | estacion | escanear | (admin) contenedores, alertas…
+  const [pantalla, setPantalla] = useState('login'); // login | registro | recuperar | mapa | estacion | escanear | desafios | ranking | perfil | (admin) contenedores, alertas…
   const [perfil, setPerfil] = useState(null);
   const [estacion, setEstacion] = useState(null);
   const [iniciando, setIniciando] = useState(true);
+  const [racha, setRacha] = useState(0); // días seguidos reciclando, para la barra superior
   const t = temaDe(darkMode);
 
   // Restaura la sesión guardada (solo la primera vez que Firebase informa el estado).
@@ -68,17 +76,11 @@ export default function App() {
     return baja;
   }, []);
 
-  // Fija el viewport en el navegador para que el celular no amplíe la página
+  // Racha de la barra superior: se pide al entrar y cada vez que cambia el saldo (un depósito nuevo puede extenderla).
   useEffect(() => {
-    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
-    let meta = document.querySelector('meta[name="viewport"]');
-    if (!meta) {
-      meta = document.createElement('meta');
-      meta.setAttribute('name', 'viewport');
-      document.head.appendChild(meta);
-    }
-    meta.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover');
-  }, []);
+    if (!perfil) { setRacha(0); return; }
+    obtenerInsignias().then((d) => setRacha(d.racha?.actual ?? 0)).catch(() => {});
+  }, [perfil?.id_usuario, perfil?.saldo_ecopoints]);
 
   const entrar = (p) => { setPerfil(p); setPantalla(inicioDe(p)); };
   const salir = () => { cerrarSesion().catch(() => {}); setPerfil(null); setEstacion(null); setPantalla('login'); };
@@ -118,7 +120,7 @@ export default function App() {
   } else {
     contenido = (
       <>
-        <Header darkMode={darkMode} toggleDarkMode={() => setDarkMode((d) => !d)} inicial={perfil.nombre_completo?.charAt(0).toUpperCase()} />
+        {!['perfil', 'configuracion', 'logros'].includes(pantalla) ? <Header darkMode={darkMode} toggleDarkMode={() => setDarkMode((d) => !d)} inicial={perfil.nombre_completo?.charAt(0).toUpperCase()} racha={racha} ecopoints={perfil.saldo_ecopoints ?? 0} onPerfil={() => setPantalla('perfil')} /> : null}
         <View style={{ flex: 1 }}>
           {pantalla === 'estacion' ? (
             <EstacionScreen station={estacion} darkMode={darkMode} onBack={() => setPantalla('mapa')} />
@@ -128,23 +130,30 @@ export default function App() {
               saldo={perfil.saldo_ecopoints}
               onDeposito={(d) => setPerfil((p) => ({ ...p, saldo_ecopoints: d.saldo_ecopoints }))}
             />
+          ) : pantalla === 'desafios' ? (
+            <DesafiosScreen perfil={perfil} darkMode={darkMode} />
+          ) : pantalla === 'ranking' ? (
+            <RankingScreen perfil={perfil} darkMode={darkMode} />
+          ) : pantalla === 'perfil' ? (
+            <PerfilScreen perfil={perfil} darkMode={darkMode} onVolver={() => setPantalla('mapa')} onConfiguracion={() => setPantalla('configuracion')} onVerLogros={() => setPantalla('logros')} />
+          ) : pantalla === 'logros' ? (
+            <LogrosScreen perfil={perfil} darkMode={darkMode} onVolver={() => setPantalla('perfil')} />
+          ) : pantalla === 'configuracion' ? (
+            <ConfiguracionScreen perfil={perfil} darkMode={darkMode} toggleDarkMode={() => setDarkMode((d) => !d)} onVolver={() => setPantalla('perfil')} onSalir={salir} />
           ) : (
             <MapaScreen darkMode={darkMode} onViewStation={(s) => { setEstacion(s); setPantalla('estacion'); }} />
           )}
         </View>
-        <BottomNav
-          active={pantalla === 'escanear' ? 'escanear' : 'mapa'}
-          darkMode={darkMode}
+        {/* El perfil y la configuración ocupan toda la pantalla (como en Duolingo): sin encabezado ni barra inferior. */}
+        {!['perfil', 'configuracion', 'logros'].includes(pantalla) ? (
+        <BottomNav 
+          active={['escanear', 'desafios', 'ranking'].includes(pantalla) ? pantalla : 'mapa'} 
+          darkMode={darkMode} 
           onNavigate={(id) => {
-            if (id === 'logout') {
-              salir();
-            } else if (id === 'escanear') {
-              setPantalla('escanear');
-            } else {
-              setPantalla('mapa');
-            }
-          }}
+            setPantalla(['escanear', 'desafios', 'ranking'].includes(id) ? id : 'mapa');
+          }} 
         />
+        ) : null}
       </>
     );
   }

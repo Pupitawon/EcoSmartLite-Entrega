@@ -2,6 +2,9 @@ const { z } = require('zod');
 const { esAdmin } = require('../middleware/adminAuth');
 const pool = require('../config/db');
 const config = require('../config/config');
+const { resumenInsignias } = require('../services/insigniaService');
+const { resumenDesafios } = require('../services/desafioService');
+const { resumenRanking } = require('../services/rankingService');
 
 // RUT chileno: 7-8 dígitos + dígito verificador (módulo 11). Se guarda como 12345678-K, sin puntos.
 function normalizarRut(raw) {
@@ -62,6 +65,13 @@ const registrarUsuario = async (req, res) => {
     const ya = await pool.query(`SELECT ${COLUMNAS} FROM usuario WHERE id_auth = $1`, [req.user.uid]);
     return res.status(200).json({ usuario: ya.rows[0], creado: false });
   } catch (err) {
+    // Carrera: otra cuenta registró el mismo RUT (o correo) entre la verificación y el INSERT.
+    if (err.code === '23505') {
+      if (err.constraint === 'uq_usuario_correo') {
+        return res.status(409).json({ error: 'correo_en_uso', mensaje: 'Ese correo ya está registrado' });
+      }
+      return res.status(409).json({ error: 'rut_en_uso', mensaje: 'Ese RUT ya está registrado' });
+    }
     console.error('Error al registrar usuario:', err.message);
     res.status(500).json({ error: 'error_interno' });
   }
@@ -80,6 +90,42 @@ const miPerfil = async (req, res) => {
     res.json({ usuario: { ...r.rows[0], es_admin: admin } });
   } catch (err) {
     console.error('Error al leer perfil:', err.message);
+    res.status(500).json({ error: 'error_interno' });
+  }
+};
+
+// Insignias, avance y racha del usuario autenticado (pantalla Perfil de la app).
+const misInsignias = async (req, res) => {
+  try {
+    const r = await resumenInsignias(req.user.uid);
+    if (!r) return res.status(404).json({ error: 'perfil_no_encontrado' });
+    res.json({ resumen: r });
+  } catch (err) {
+    console.error('Error al leer insignias:', err.message);
+    res.status(500).json({ error: 'error_interno' });
+  }
+};
+
+// Desafíos del día y del mes del usuario autenticado (pantalla Desafíos de la app).
+const misDesafios = async (req, res) => {
+  try {
+    const r = await resumenDesafios(req.user.uid);
+    if (!r) return res.status(404).json({ error: 'perfil_no_encontrado' });
+    res.json({ desafios: r });
+  } catch (err) {
+    console.error('Error al leer desafíos:', err.message);
+    res.status(500).json({ error: 'error_interno' });
+  }
+};
+
+// Ranking del mes por botellas recicladas (pantalla Ranking de la app).
+const miRanking = async (req, res) => {
+  try {
+    const r = await resumenRanking(req.user.uid);
+    if (!r) return res.status(404).json({ error: 'perfil_no_encontrado' });
+    res.json({ ranking: r });
+  } catch (err) {
+    console.error('Error al leer el ranking:', err.message);
     res.status(500).json({ error: 'error_interno' });
   }
 };
@@ -134,4 +180,4 @@ const recuperarClave = async (req, res) => {
   }
 };
 
-module.exports = { registrarUsuario, miPerfil, recuperarClave, rutValido, normalizarRut };
+module.exports = { registrarUsuario, miPerfil, misInsignias, misDesafios, miRanking, recuperarClave, rutValido, normalizarRut };

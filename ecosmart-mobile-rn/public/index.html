@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="%LANG_ISO_CODE%">
+  <head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <!-- Sin zoom: ancho del celular, escala fija y sin pellizco. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <title>%WEB_TITLE%</title>
+    <style id="expo-reset">
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        overflow: hidden;
+      }
+      #root {
+        display: flex;
+        height: 100%;
+        flex: 1;
+      }
+    </style>
+    <style id="ecosmart-movil">
+      /* iPhone ignora maximum-scale: se frena el doble toque y el ajuste automático de texto. */
+      html, body { touch-action: manipulation; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; overscroll-behavior: none; }
+      /* iPhone amplía la página al tocar un campo con letra menor a 16 px. */
+      @media (pointer: coarse) { input, textarea, select { font-size: 16px !important; } }
+      /* Aviso "solo vertical": solo en celulares (puntero táctil) puestos en horizontal. */
+      #solo-vertical { display: none; }
+      @media (pointer: coarse) and (orientation: landscape) and (max-height: 600px) {
+        #solo-vertical {
+          display: flex; position: fixed; inset: 0; z-index: 9999; flex-direction: column; gap: 10px;
+          align-items: center; justify-content: center; padding: 24px; text-align: center;
+          background: #09090b; color: #ffffff; font-family: system-ui, sans-serif;
+        }
+        #solo-vertical h1 { margin: 0; font-size: 20px; font-weight: 800; }
+        #solo-vertical p { margin: 0; max-width: 320px; font-size: 14px; color: #a1a1aa; }
+      }
+    </style>
+  </head>
+
+  <body>
+    <noscript> You need to enable JavaScript to run this app. </noscript>
+    <div id="root"></div>
+
+    <div id="solo-vertical" role="alert">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+      <h1>Gira tu teléfono</h1>
+      <p>EcoSmart se usa en vertical. Pon el celular derecho para continuar.</p>
+    </div>
+
+    <script>
+      // iPhone: el pellizco con dos dedos se frena aparte (maximum-scale no lo respeta).
+      ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (n) {
+        document.addEventListener(n, function (ev) { ev.preventDefault(); });
+      });
+      // Android: bloquea la rotación cuando el navegador lo permite (pantalla completa o app instalada).
+      try {
+        if (window.screen && screen.orientation && screen.orientation.lock) {
+          screen.orientation.lock('portrait').catch(function () {});
+        }
+      } catch (e) {}
+    </script>
+  </body>
+</html>

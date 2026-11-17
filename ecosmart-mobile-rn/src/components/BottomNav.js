@@ -1,11 +1,12 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { LogOut, MapPin, QrCode } from 'lucide-react-native';
+import { MapPin, QrCode, Target, Trophy } from 'lucide-react-native';
 import { temaDe } from '../tema';
 
 const ITEMS = [
   { id: 'mapa', icon: MapPin, label: 'Mapa' },
   { id: 'escanear', icon: QrCode, label: 'Escanear' },
-  { id: 'logout', icon: LogOut, label: 'Salir' },
+  { id: 'desafios', icon: Target, label: 'Desafíos' },
+  { id: 'ranking', icon: Trophy, label: 'Ranking' },
 ];
 
 // `items` permite reemplazar las pestañas (ej. las del administrador).
@@ -45,6 +46,6 @@ const e = StyleSheet.create({
     borderTopRightRadius: 24,
     borderTopWidth: 1,
   },
-  item: { alignItems: 'center', borderRadius: 16, paddingHorizontal: 22, paddingVertical: 8 },
+  item: { alignItems: 'center', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8 },
   itemCompacto: { flex: 1, paddingHorizontal: 2 },
 });

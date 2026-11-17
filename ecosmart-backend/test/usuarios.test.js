@@ -1,3 +1,5 @@
+// UID de administrador para estas pruebas (antes de cargar la app, que lee la config al iniciar).
+process.env.ADMIN_UIDS = 'uid-test-admin';
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
@@ -97,4 +99,12 @@ test('GET /me devuelve el perfil propio; sin registro → 404', async () => {
   assert.equal((await ok.json()).usuario.rut, '11111111-1');
   const no = await fetch(`${base}/api/usuarios/me`, { headers: { Authorization: `Bearer ${await token({ sub: 'uid-test-nuevo' })}` } });
   assert.equal(no.status, 404);
+});
+
+test('GET /me marca es_admin; un administrador sin perfil de ciudadano igual puede entrar', async () => {
+  const ciudadano = await (await fetch(`${base}/api/usuarios/me`, { headers: { Authorization: `Bearer ${await token({ sub: 'uid-test-1' })}` } })).json();
+  assert.equal(ciudadano.usuario.es_admin, false);
+  const admin = await fetch(`${base}/api/usuarios/me`, { headers: { Authorization: `Bearer ${await token({ sub: 'uid-test-admin' })}` } });
+  assert.equal(admin.status, 200);
+  assert.equal((await admin.json()).usuario.es_admin, true);
 });

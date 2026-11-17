@@ -26,6 +26,11 @@ async function getJSON(ruta) {
 
 export const getContenedores = () => getJSON('/api/contenedores');
 
+// Panel de administración (lectura pública).
+export const getConfig = () => getJSON('/api/config');
+export const getAlertas = () => getJSON('/api/alertas');
+export const getReportes = () => getJSON('/api/reportes');
+
 // Llamadas que exigen sesión: agregan el token de Firebase.
 export async function llamar(ruta, opciones = {}) {
   if (!auth?.currentUser) throw new Error('Debes iniciar sesión.');
@@ -46,4 +51,54 @@ export async function llamarPublico(ruta, opciones = {}) {
   });
   const datos = await res.json().catch(() => ({}));
   return { status: res.status, datos };
+}
+
+/** Cambia el estado de revisión de un reporte ciudadano. Solo administradores (ADMIN_UIDS en el backend). */
+export async function actualizarReporte(id, estado_revision) {
+  const { status, datos } = await llamar(`/api/reportes/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ estado_revision }),
+  });
+  if (status === 200) return datos.reporte;
+  throw new Error(
+    status === 403 ? 'Tu cuenta no es de administrador.'
+      : status === 404 ? 'El reporte ya no existe.'
+      : `El servidor respondió ${status}.`
+  );
+}
+
+// Órdenes de trabajo del panel de administración. Solo administradores (ADMIN_UIDS en el backend).
+function errorOrden(status) {
+  return new Error(
+    status === 401 ? 'Debes iniciar sesión.'
+      : status === 403 ? 'Tu cuenta no es de administrador.'
+      : status === 404 ? 'La orden o el contenedor ya no existe.'
+      : status === 409 ? 'La orden ya está cerrada.'
+      : status === 422 ? 'Datos de la orden no válidos.'
+      : `El servidor respondió ${status}.`
+  );
+}
+
+export async function getOrdenes() {
+  const { status, datos } = await llamar('/api/ordenes');
+  if (status === 200) return datos;
+  throw errorOrden(status);
+}
+
+export async function crearOrden(orden) {
+  const { status, datos } = await llamar('/api/ordenes', { method: 'POST', body: JSON.stringify(orden) });
+  if (status === 201) return datos.orden;
+  throw errorOrden(status);
+}
+
+export async function avanzarOrden(idOrden) {
+  const { status, datos } = await llamar(`/api/ordenes/${idOrden}/avanzar`, { method: 'PATCH' });
+  if (status === 200) return datos.orden;
+  throw errorOrden(status);
+}
+
+export async function eliminarOrden(idOrden) {
+  const { status } = await llamar(`/api/ordenes/${idOrden}`, { method: 'DELETE' });
+  if (status === 204 || status === 404) return; // 404: otro administrador ya la eliminó
+  throw errorOrden(status);
 }

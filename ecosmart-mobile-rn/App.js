@@ -21,9 +21,36 @@ import LogrosScreen from './src/screens/LogrosScreen';
 import RankingScreen from './src/screens/RankingScreen';
 import DesafiosScreen from './src/screens/DesafiosScreen';
 
+import { AlertTriangle, Boxes, ChartColumn, ClipboardList, LogOut, MessageSquareWarning } from 'lucide-react-native';
+import { AdminDataProvider } from './src/admin/AdminData';
+import ContenedoresScreen from './src/screens/admin/ContenedoresScreen';
+import AlertasScreen from './src/screens/admin/AlertasScreen';
+import ReportesScreen from './src/screens/admin/ReportesScreen';
+import OrdenesScreen from './src/screens/admin/OrdenesScreen';
+import IndicadoresScreen from './src/screens/admin/IndicadoresScreen';
+
+// Pestañas del administrador (Innova Recicla). Reemplazan al antiguo panel web del backend.
+const ADMIN_ITEMS = [
+  { id: 'contenedores', icon: Boxes, label: 'Panel' },
+  { id: 'alertas', icon: AlertTriangle, label: 'Alertas' },
+  { id: 'reportes', icon: MessageSquareWarning, label: 'Reportes' },
+  { id: 'ordenes', icon: ClipboardList, label: 'Órdenes' },
+  { id: 'indicadores', icon: ChartColumn, label: 'Datos' },
+  { id: 'logout', icon: LogOut, label: 'Salir' },
+];
+const ADMIN_PANTALLAS = {
+  contenedores: ContenedoresScreen,
+  alertas: AlertasScreen,
+  reportes: ReportesScreen,
+  ordenes: OrdenesScreen,
+  indicadores: IndicadoresScreen,
+};
+
+const inicioDe = (p) => (p?.es_admin ? 'contenedores' : 'mapa');
+
 export default function App() {
   const [darkMode, setDarkMode] = useState(true); // como la app de Jeremy
-  const [pantalla, setPantalla] = useState('login'); // login | registro | recuperar | mapa | estacion | escanear | perfil
+  const [pantalla, setPantalla] = useState('login'); // login | registro | recuperar | mapa | estacion | escanear | desafios | ranking | perfil | (admin) contenedores, alertas…
   const [perfil, setPerfil] = useState(null);
   const [estacion, setEstacion] = useState(null);
   const [iniciando, setIniciando] = useState(true);
@@ -41,7 +68,7 @@ export default function App() {
       if (usuario) {
         try {
           const p = await obtenerPerfil();
-          if (p) { setPerfil(p); setPantalla('mapa'); }
+          if (p) { setPerfil(p); setPantalla(inicioDe(p)); }
         } catch { /* sin conexión: queda en el login */ }
       }
       setIniciando(false);
@@ -55,7 +82,7 @@ export default function App() {
     obtenerInsignias().then((d) => setRacha(d.racha?.actual ?? 0)).catch(() => {});
   }, [perfil?.id_usuario, perfil?.saldo_ecopoints]);
 
-  const entrar = (p) => { setPerfil(p); setPantalla('mapa'); };
+  const entrar = (p) => { setPerfil(p); setPantalla(inicioDe(p)); };
   const salir = () => { cerrarSesion().catch(() => {}); setPerfil(null); setEstacion(null); setPantalla('login'); };
 
   let contenido;
@@ -73,6 +100,23 @@ export default function App() {
       : pantalla === 'recuperar'
         ? <RecuperarClaveScreen darkMode={darkMode} onBack={() => setPantalla('login')} />
         : <LoginScreen darkMode={darkMode} onLogin={entrar} onGoToRegister={() => setPantalla('registro')} onGoToRecuperar={() => setPantalla('recuperar')} />;
+  } else if (perfil.es_admin) {
+    // Administrador: el backend lo reconoce por su UID (ADMIN_UIDS) y lo indica en /api/usuarios/me.
+    const Pantalla = ADMIN_PANTALLAS[pantalla] || ContenedoresScreen;
+    contenido = (
+      <AdminDataProvider darkMode={darkMode} onIrA={setPantalla}>
+        <Header darkMode={darkMode} toggleDarkMode={() => setDarkMode((d) => !d)} inicial="A" />
+        <View style={{ flex: 1 }}>
+          <Pantalla />
+        </View>
+        <BottomNav
+          items={ADMIN_ITEMS}
+          active={ADMIN_PANTALLAS[pantalla] ? pantalla : 'contenedores'}
+          darkMode={darkMode}
+          onNavigate={(id) => (id === 'logout' ? salir() : setPantalla(id))}
+        />
+      </AdminDataProvider>
+    );
   } else {
     contenido = (
       <>
@@ -81,10 +125,10 @@ export default function App() {
           {pantalla === 'estacion' ? (
             <EstacionScreen station={estacion} darkMode={darkMode} onBack={() => setPantalla('mapa')} />
           ) : pantalla === 'escanear' ? (
-            <EscanearScreen 
-              darkMode={darkMode} 
-              saldo={perfil.saldo_ecopoints} 
-              onDeposito={(d) => setPerfil((p) => ({ ...p, saldo_ecopoints: d.saldo_ecopoints }))} 
+            <EscanearScreen
+              darkMode={darkMode}
+              saldo={perfil.saldo_ecopoints}
+              onDeposito={(d) => setPerfil((p) => ({ ...p, saldo_ecopoints: d.saldo_ecopoints }))}
             />
           ) : pantalla === 'desafios' ? (
             <DesafiosScreen perfil={perfil} darkMode={darkMode} />

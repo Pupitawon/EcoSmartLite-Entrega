@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import { ArrowLeft, ChevronDown, ChevronUp, Lock, LogOut, Moon } from 'lucide-react-native';
+import { ArrowLeft, Bell, ChevronDown, ChevronUp, Lock, LogOut, Moon } from 'lucide-react-native';
 import Campo from '../components/Campo';
 import RequisitosClave from '../components/RequisitosClave';
 import { claveValida } from '../utils/clave';
-import { cambiarClave } from '../services/auth';
+import { cambiarClave, guardarNotificaciones } from '../services/auth';
 import { temaDe } from '../tema';
 
 // 12345678-5 -> 12.345.678-5
@@ -13,10 +13,32 @@ const formatearRut = (rut) => (rut ? rut.replace(/^(\d+)-(.)$/, (_, n, dv) => `$
 /**
  * Configuración (como la de Duolingo): datos de la cuenta, apariencia y Cerrar sesión al final.
  * Cerrar sesión pide confirmación para no salir por accidente.
+ * La usan el ciudadano y el administrador: el administrador no tiene RUT ni notificaciones.
  */
-export default function ConfiguracionScreen({ perfil, darkMode, toggleDarkMode, onVolver, onSalir }) {
+export default function ConfiguracionScreen({ perfil, darkMode, toggleDarkMode, onVolver, onSalir, onPerfilActualizado }) {
   const t = temaDe(darkMode);
+  const esAdmin = Boolean(perfil?.es_admin);
   const [confirmando, setConfirmando] = useState(false);
+  const [notificaciones, setNotificaciones] = useState(perfil?.recibe_notificaciones !== false);
+  const [guardandoNotif, setGuardandoNotif] = useState(false);
+  const [errorNotif, setErrorNotif] = useState('');
+
+  // Se cambia al instante y se guarda; si el servidor falla, vuelve al valor anterior.
+  const cambiarNotificaciones = async (valor) => {
+    const anterior = notificaciones;
+    setNotificaciones(valor);
+    setErrorNotif('');
+    setGuardandoNotif(true);
+    try {
+      const actualizado = await guardarNotificaciones(valor);
+      onPerfilActualizado?.(actualizado);
+    } catch (err) {
+      setNotificaciones(anterior);
+      setErrorNotif(err.message);
+    } finally {
+      setGuardandoNotif(false);
+    }
+  };
   const [cambiando, setCambiando] = useState(false); // formulario "Cambiar contraseña" desplegado
   const [f, setF] = useState({ actual: '', nueva: '', repetir: '' });
   const [guardando, setGuardando] = useState(false);
@@ -55,15 +77,24 @@ export default function ConfiguracionScreen({ perfil, darkMode, toggleDarkMode, 
 
       <Text style={[etiqueta, { marginTop: 8 }]}>CUENTA</Text>
       <View style={[e.tarjeta, { backgroundColor: t.superficie, borderColor: t.borde }]}>
-        <View style={e.dato}>
-          <Text style={{ color: t.textoSuave, fontSize: 12 }}>Nombre</Text>
-          <Text style={{ color: t.texto, fontWeight: '600', fontSize: 15 }}>{perfil?.nombre_completo}</Text>
-        </View>
-        <View style={[e.divisor, { backgroundColor: t.borde }]} />
-        <View style={e.dato}>
-          <Text style={{ color: t.textoSuave, fontSize: 12 }}>RUT</Text>
-          <Text style={{ color: t.texto, fontWeight: '600', fontSize: 15 }}>{formatearRut(perfil?.rut) || '-'}</Text>
-        </View>
+        {esAdmin ? (
+          <View style={e.dato}>
+            <Text style={{ color: t.textoSuave, fontSize: 12 }}>Rol</Text>
+            <Text style={{ color: t.texto, fontWeight: '600', fontSize: 15 }}>Administrador · Innova Recicla</Text>
+          </View>
+        ) : (
+          <>
+            <View style={e.dato}>
+              <Text style={{ color: t.textoSuave, fontSize: 12 }}>Nombre</Text>
+              <Text style={{ color: t.texto, fontWeight: '600', fontSize: 15 }}>{perfil?.nombre_completo}</Text>
+            </View>
+            <View style={[e.divisor, { backgroundColor: t.borde }]} />
+            <View style={e.dato}>
+              <Text style={{ color: t.textoSuave, fontSize: 12 }}>RUT</Text>
+              <Text style={{ color: t.texto, fontWeight: '600', fontSize: 15 }}>{formatearRut(perfil?.rut) || '-'}</Text>
+            </View>
+          </>
+        )}
         <View style={[e.divisor, { backgroundColor: t.borde }]} />
         <View style={e.dato}>
           <Text style={{ color: t.textoSuave, fontSize: 12 }}>Correo</Text>
@@ -97,6 +128,33 @@ export default function ConfiguracionScreen({ perfil, darkMode, toggleDarkMode, 
           </View>
         ) : null}
       </View>
+
+      {!esAdmin ? (
+        <>
+          <Text style={etiqueta}>NOTIFICACIONES</Text>
+          <View style={[e.tarjeta, { backgroundColor: t.superficie, borderColor: t.borde }]}>
+            <View style={[e.dato, { flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
+              <Bell size={20} color={t.texto} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: t.texto, fontWeight: '600', fontSize: 15 }}>Recibir notificaciones</Text>
+                <Text style={{ color: t.textoSuave, fontSize: 12, marginTop: 2 }}>Avisos de EcoSmart sobre tus puntos y los contenedores</Text>
+              </View>
+              {guardandoNotif ? <ActivityIndicator size="small" color={t.acento} /> : null}
+              <Switch
+                value={notificaciones}
+                onValueChange={cambiarNotificaciones}
+                disabled={guardandoNotif}
+                accessibilityLabel="Recibir notificaciones"
+                trackColor={{ true: t.acento, false: darkMode ? '#3f3f46' : '#d6d3d1' }}
+                thumbColor="#ffffff"
+              />
+            </View>
+            {errorNotif ? (
+              <Text style={{ color: t.error, fontSize: 12, paddingHorizontal: 16, paddingBottom: 12 }}>{errorNotif}</Text>
+            ) : null}
+          </View>
+        </>
+      ) : null}
 
       <Text style={etiqueta}>APARIENCIA</Text>
       <View style={[e.tarjeta, { backgroundColor: t.superficie, borderColor: t.borde }]}>

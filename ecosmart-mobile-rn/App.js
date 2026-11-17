@@ -21,7 +21,7 @@ import LogrosScreen from './src/screens/LogrosScreen';
 import RankingScreen from './src/screens/RankingScreen';
 import DesafiosScreen from './src/screens/DesafiosScreen';
 
-import { AlertTriangle, Boxes, ChartColumn, ClipboardList, LogOut, MessageSquareWarning } from 'lucide-react-native';
+import { AlertTriangle, Boxes, ChartColumn, ClipboardList, MessageSquareWarning } from 'lucide-react-native';
 import { AdminDataProvider } from './src/admin/AdminData';
 import ContenedoresScreen from './src/screens/admin/ContenedoresScreen';
 import AlertasScreen from './src/screens/admin/AlertasScreen';
@@ -30,13 +30,13 @@ import OrdenesScreen from './src/screens/admin/OrdenesScreen';
 import IndicadoresScreen from './src/screens/admin/IndicadoresScreen';
 
 // Pestañas del administrador (Innova Recicla). Reemplazan al antiguo panel web del backend.
+// Cerrar sesión está en Configuración (avatar del encabezado), con confirmación.
 const ADMIN_ITEMS = [
   { id: 'contenedores', icon: Boxes, label: 'Panel' },
   { id: 'alertas', icon: AlertTriangle, label: 'Alertas' },
   { id: 'reportes', icon: MessageSquareWarning, label: 'Reportes' },
   { id: 'ordenes', icon: ClipboardList, label: 'Órdenes' },
   { id: 'indicadores', icon: ChartColumn, label: 'Datos' },
-  { id: 'logout', icon: LogOut, label: 'Salir' },
 ];
 const ADMIN_PANTALLAS = {
   contenedores: ContenedoresScreen,
@@ -55,6 +55,7 @@ export default function App() {
   const [estacion, setEstacion] = useState(null);
   const [iniciando, setIniciando] = useState(true);
   const [racha, setRacha] = useState(0); // días seguidos reciclando, para la barra superior
+  const [adminPrevia, setAdminPrevia] = useState('contenedores'); // pestaña a la que vuelve el admin al salir de Configuración
   const t = temaDe(darkMode);
 
   // Restaura la sesión guardada (solo la primera vez que Firebase informa el estado).
@@ -104,17 +105,36 @@ export default function App() {
     // Administrador: el backend lo reconoce por su UID (ADMIN_UIDS) y lo indica en /api/usuarios/me.
     const Pantalla = ADMIN_PANTALLAS[pantalla] || ContenedoresScreen;
     contenido = (
+      // El proveedor sigue montado en Configuración para no perder ni recargar los datos del panel.
       <AdminDataProvider darkMode={darkMode} onIrA={setPantalla}>
-        <Header darkMode={darkMode} toggleDarkMode={() => setDarkMode((d) => !d)} inicial="A" />
-        <View style={{ flex: 1 }}>
-          <Pantalla />
-        </View>
-        <BottomNav
-          items={ADMIN_ITEMS}
-          active={ADMIN_PANTALLAS[pantalla] ? pantalla : 'contenedores'}
-          darkMode={darkMode}
-          onNavigate={(id) => (id === 'logout' ? salir() : setPantalla(id))}
-        />
+        {pantalla === 'configuracion' ? (
+          <ConfiguracionScreen
+            perfil={perfil}
+            darkMode={darkMode}
+            toggleDarkMode={() => setDarkMode((d) => !d)}
+            onVolver={() => setPantalla(adminPrevia)}
+            onSalir={salir}
+          />
+        ) : (
+          <>
+            <Header
+              darkMode={darkMode}
+              toggleDarkMode={() => setDarkMode((d) => !d)}
+              inicial="A"
+              admin
+              onPerfil={() => { setAdminPrevia(ADMIN_PANTALLAS[pantalla] ? pantalla : 'contenedores'); setPantalla('configuracion'); }}
+            />
+            <View style={{ flex: 1 }}>
+              <Pantalla />
+            </View>
+            <BottomNav
+              items={ADMIN_ITEMS}
+              active={ADMIN_PANTALLAS[pantalla] ? pantalla : 'contenedores'}
+              darkMode={darkMode}
+              onNavigate={setPantalla}
+            />
+          </>
+        )}
       </AdminDataProvider>
     );
   } else {
@@ -139,7 +159,14 @@ export default function App() {
           ) : pantalla === 'logros' ? (
             <LogrosScreen perfil={perfil} darkMode={darkMode} onVolver={() => setPantalla('perfil')} />
           ) : pantalla === 'configuracion' ? (
-            <ConfiguracionScreen perfil={perfil} darkMode={darkMode} toggleDarkMode={() => setDarkMode((d) => !d)} onVolver={() => setPantalla('perfil')} onSalir={salir} />
+            <ConfiguracionScreen
+              perfil={perfil}
+              darkMode={darkMode}
+              toggleDarkMode={() => setDarkMode((d) => !d)}
+              onVolver={() => setPantalla('perfil')}
+              onSalir={salir}
+              onPerfilActualizado={(p) => setPerfil((x) => ({ ...x, recibe_notificaciones: p.recibe_notificaciones }))}
+            />
           ) : (
             <MapaScreen darkMode={darkMode} onViewStation={(s) => { setEstacion(s); setPantalla('estacion'); }} />
           )}

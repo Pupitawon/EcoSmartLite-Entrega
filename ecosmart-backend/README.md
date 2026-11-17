@@ -67,6 +67,7 @@ La app crea la cuenta en Firebase y luego llama al backend con el ID token (`Aut
 
 - `POST /api/usuarios/registro` con `{ "rut": "12345678-5", "nombre_completo": "Ana Pérez", "recibe_notificaciones": true }` → 201 (creado) / 200 (ya existía) / 409 RUT en uso / 422 datos inválidos / 401 token inválido.
 - `GET /api/usuarios/me` → perfil del usuario autenticado (404 si aún no se registró).
+- `PATCH /api/usuarios/me` con `{ "recibe_notificaciones": true | false }` → 200 con el perfil actualizado / 422 (otro campo o tipo) / 404 sin perfil / 401. Es lo único que el ciudadano puede cambiar de su perfil.
 - `POST /api/reportes` con `{ "id_contenedor": 102, "tipo_anomalia": "danado" | "residuos_incorrectos" | "otro", "descripcion": "opcional, máx. 500" }` → 201 / 404 (`perfil_no_encontrado` o `contenedor_no_existe`) / 422 / 401. Se avisa en vivo por `/api/stream` (`event: reporte`).
 
 El administrador lee `GET /api/reportes?estado=pendiente|en_revision|resuelto|descartado` (sin nombre, RUT ni correo de quien reporta) y cambia el estado con `PATCH /api/reportes/:id` `{ "estado_revision": "resuelto" }`. El `PATCH` exige token de Firebase de una cuenta en `ADMIN_UIDS` → 401 sin token, 403 si no es administrador.

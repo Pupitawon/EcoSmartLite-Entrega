@@ -10,8 +10,9 @@ const logoOscuro = require('../../assets/logos/logo-ecosmart-oscuro.png');
  * Encabezado con racha, EcoPuntos, tema y perfil. Cada elemento muestra un globo pequeño que explica qué es:
  * - Computador: al pasar el cursor por encima; se va al sacarlo.
  * - Celular: al mantener presionado (y al tocar racha o EcoPuntos); se va al tocar en otro lado o a los 3,5 s.
+ * Con `admin` no se muestran racha ni EcoPuntos (el administrador no recicla) y el avatar abre Configuración.
  */
-export default function Header({ darkMode, toggleDarkMode, inicial, onPerfil, racha = 0, ecopoints = 0 }) {
+export default function Header({ darkMode, toggleDarkMode, inicial, onPerfil, racha = 0, ecopoints = 0, admin = false }) {
   const t = temaDe(darkMode);
   const [abierto, setAbierto] = useState(null); // id del globo visible
   const temporizador = useRef(null);
@@ -39,7 +40,7 @@ export default function Header({ darkMode, toggleDarkMode, inicial, onPerfil, ra
     racha: racha > 0 ? `Racha: llevas ${racha} ${racha === 1 ? 'día' : 'días'} seguidos reciclando` : 'Racha: recicla hoy para empezar una',
     ecopoints: 'Tus EcoPuntos disponibles',
     tema: darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro',
-    perfil: 'Mi perfil',
+    perfil: admin ? 'Configuración' : 'Mi perfil',
   };
 
   // Envuelve un elemento y le agrega el globo.
@@ -65,13 +66,13 @@ export default function Header({ darkMode, toggleDarkMode, inicial, onPerfil, ra
     <View style={[e.header, { backgroundColor: darkMode ? '#09090b' : '#ffffff', borderBottomColor: t.borde }]}>
       <Image source={darkMode ? logoOscuro : logoClaro} style={e.logo} resizeMode="contain" accessibilityLabel="EcoSmart" />
       <View style={e.controles}>
-        {con('racha', (
+        {!admin && con('racha', (
           <Pressable {...eventos('racha', true)} style={e.dato} accessibilityLabel={`Racha de ${racha} días`}>
             <Flame size={18} color={racha > 0 ? '#f97316' : t.textoSuave} fill={racha > 0 ? '#f97316' : 'none'} />
             <Text style={{ color: racha > 0 ? '#f97316' : t.textoSuave, fontWeight: '800', fontSize: 14 }}>{racha}</Text>
           </Pressable>
         ))}
-        {con('ecopoints', (
+        {!admin && con('ecopoints', (
           <Pressable {...eventos('ecopoints', true)} style={e.dato} accessibilityLabel={`${ecopoints} EcoPuntos`}>
             <Leaf size={18} color={t.acento} />
             <Text style={{ color: t.acentoFuerte, fontWeight: '800', fontSize: 14 }}>{ecopoints}</Text>
@@ -86,7 +87,7 @@ export default function Header({ darkMode, toggleDarkMode, inicial, onPerfil, ra
           <Pressable
             onPress={onPerfil}
             {...eventos('perfil', false)}
-            accessibilityLabel="Abrir mi perfil"
+            accessibilityLabel={admin ? 'Abrir configuración' : 'Abrir mi perfil'}
             style={[
               e.avatar,
               { backgroundColor: darkMode ? '#27272a' : '#d1fae5', borderColor: darkMode ? '#10b981' : '#059669' },

@@ -46,6 +46,16 @@ export async function obtenerPerfil() {
   throw new Error('No se pudo cargar tu perfil. Inténtalo de nuevo.');
 }
 
+/** Guarda si el ciudadano quiere recibir notificaciones. Devuelve el perfil actualizado. */
+export async function guardarNotificaciones(recibe) {
+  const { status, datos } = await llamar('/api/usuarios/me', {
+    method: 'PATCH',
+    body: JSON.stringify({ recibe_notificaciones: recibe }),
+  });
+  if (status === 200) return datos.usuario;
+  throw new Error('No se pudo guardar tu preferencia. Inténtalo de nuevo.');
+}
+
 /** Inicia sesión y devuelve el perfil (null si la cuenta no completó su registro). */
 export async function iniciarSesion(correo, clave) {
   await signInWithEmailAndPassword(auth, correo, clave);

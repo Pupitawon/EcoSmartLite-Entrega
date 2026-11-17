@@ -108,3 +108,23 @@ test('GET /me marca es_admin; un administrador sin perfil de ciudadano igual pue
   assert.equal(admin.status, 200);
   assert.equal((await admin.json()).usuario.es_admin, true);
 });
+
+test('PATCH /me cambia recibe_notificaciones; solo ese campo; sin perfil → 404', async () => {
+  const patch = async (sub, body) =>
+    fetch(`${base}/api/usuarios/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...(sub ? { Authorization: `Bearer ${await token({ sub })}` } : {}) },
+      body: JSON.stringify(body),
+    });
+
+  const off = await patch('uid-test-1', { recibe_notificaciones: false });
+  assert.equal(off.status, 200);
+  assert.equal((await off.json()).usuario.recibe_notificaciones, false);
+  const on = await patch('uid-test-1', { recibe_notificaciones: true });
+  assert.equal((await on.json()).usuario.recibe_notificaciones, true);
+
+  assert.equal((await patch(null, { recibe_notificaciones: false })).status, 401);
+  assert.equal((await patch('uid-test-1', { recibe_notificaciones: 'no' })).status, 422);
+  assert.equal((await patch('uid-test-1', { recibe_notificaciones: false, saldo_ecopoints: 999 })).status, 422);
+  assert.equal((await patch('uid-test-nuevo', { recibe_notificaciones: false })).status, 404);
+});

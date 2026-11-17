@@ -94,6 +94,30 @@ const miPerfil = async (req, res) => {
   }
 };
 
+// Preferencias que el ciudadano puede cambiar desde Configuración. Por ahora solo las notificaciones.
+const preferenciasSchema = z.object({ recibe_notificaciones: z.boolean() }).strict();
+
+const actualizarPreferencias = async (req, res) => {
+  const parsed = preferenciasSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(422).json({
+      error: 'datos_invalidos',
+      detalles: parsed.error.issues.map((i) => ({ campo: i.path.join('.'), mensaje: i.message })),
+    });
+  }
+  try {
+    const r = await pool.query(
+      `UPDATE usuario SET recibe_notificaciones = $2 WHERE id_auth = $1 RETURNING ${COLUMNAS}`,
+      [req.user.uid, parsed.data.recibe_notificaciones]
+    );
+    if (!r.rows[0]) return res.status(404).json({ error: 'perfil_no_encontrado' });
+    res.json({ usuario: { ...r.rows[0], es_admin: esAdmin(req.user.uid) } });
+  } catch (err) {
+    console.error('Error al actualizar preferencias:', err.message);
+    res.status(500).json({ error: 'error_interno' });
+  }
+};
+
 // Insignias, avance y racha del usuario autenticado (pantalla Perfil de la app).
 const misInsignias = async (req, res) => {
   try {
@@ -180,4 +204,4 @@ const recuperarClave = async (req, res) => {
   }
 };
 
-module.exports = { registrarUsuario, miPerfil, misInsignias, misDesafios, miRanking, recuperarClave, rutValido, normalizarRut };
+module.exports = { registrarUsuario, miPerfil, actualizarPreferencias, misInsignias, misDesafios, miRanking, recuperarClave, rutValido, normalizarRut };

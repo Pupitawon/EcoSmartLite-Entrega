@@ -58,7 +58,7 @@ La app crea la cuenta en Firebase y luego llama al backend con el ID token (`Aut
 - `GET /api/usuarios/me` → perfil del usuario autenticado (404 si aún no se registró).
 - `POST /api/reportes` con `{ "id_contenedor": 102, "tipo_anomalia": "danado" | "residuos_incorrectos" | "otro", "descripcion": "opcional, máx. 500" }` → 201 / 404 (`perfil_no_encontrado` o `contenedor_no_existe`) / 422 / 401. Se avisa en vivo al panel (`event: reporte` en `/api/stream`).
 
-El panel lee `GET /api/reportes?estado=pendiente|en_revision|resuelto|descartado` (sin nombre, RUT ni correo de quien reporta) y cambia el estado con `PATCH /api/reportes/:id` `{ "estado_revision": "resuelto" }`.
+El panel lee `GET /api/reportes?estado=pendiente|en_revision|resuelto|descartado` (sin nombre, RUT ni correo de quien reporta). Cambiar el estado con `PATCH /api/reportes/:id` `{ "estado_revision": "resuelto" }` exige token de Firebase de un **administrador**: su UID debe estar en `ADMIN_UIDS` (separados por coma) → 401 sin token / 403 si no es admin.
 
 El UID (`id_auth`) y el correo salen del token verificado, nunca del cuerpo; el saldo de EcoPoints parte en 0.
 
@@ -88,5 +88,4 @@ npm test
 
 ## Pendientes de seguridad (fuera de esta entrega)
 
-- `POST /api/usuarios/deposito` no tiene autenticación y toma `ecopoints_otorgados` del cliente: cualquiera puede abonar puntos a cualquier usuario.
-- Las rutas `GET` son públicas y el login de la app móvil es simulado (el rol "Administrador" se elige con un botón). El panel no está protegido: cualquiera que conozca la URL puede cambiar el estado de un reporte con `PATCH /api/reportes/:id`.
+- Las rutas `GET` (`/api/reportes`, `/api/alertas`, `/api/stream`) siguen públicas porque el panel web no tiene login. No exponen datos personales.

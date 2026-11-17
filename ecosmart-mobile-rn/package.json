@@ -15,7 +15,6 @@
     "firebase": "^13.1.0",
     "leaflet": "^1.9.4",
     "lucide-react-native": "^1.61.0",
-    "node": "^26.12.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-leaflet": "^5.0.0",

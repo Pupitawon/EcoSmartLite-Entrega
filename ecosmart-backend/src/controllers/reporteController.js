@@ -27,7 +27,7 @@ const getReportes = async (req, res) => {
   }
 };
 
-// El panel cambia el estado de revisión de un reporte.
+// El administrador (app móvil) cambia el estado de revisión de un reporte.
 const patchReporte = async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) return res.status(422).json({ error: 'id_invalido' });

@@ -77,10 +77,11 @@ export default function App() {
   }, []);
 
   // Racha de la barra superior: se pide al entrar y cada vez que cambia el saldo (un depósito nuevo puede extenderla).
+  // El administrador no recicla: no se pide.
   useEffect(() => {
-    if (!perfil) { setRacha(0); return; }
+    if (!perfil || perfil.es_admin) { setRacha(0); return; }
     obtenerInsignias().then((d) => setRacha(d.racha?.actual ?? 0)).catch(() => {});
-  }, [perfil?.id_usuario, perfil?.saldo_ecopoints]);
+  }, [perfil?.id_usuario, perfil?.saldo_ecopoints, perfil?.es_admin]);
 
   const entrar = (p) => { setPerfil(p); setPantalla(inicioDe(p)); };
   const salir = () => { cerrarSesion().catch(() => {}); setPerfil(null); setEstacion(null); setPantalla('login'); };

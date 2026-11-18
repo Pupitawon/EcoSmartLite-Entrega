@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LocateFixed, MapPin, Recycle, RefreshCw, X } from 'lucide-react-native';
 import MapaView from '../components/MapaView';
+import LeyendaMapa from '../components/LeyendaMapa';
 import useContenedores from '../hooks/useContenedores';
 import useUbicacion from '../hooks/useUbicacion';
 import { distanciaMetros, textoDistancia } from '../utils/distancia';
@@ -79,18 +80,7 @@ export default function MapaScreen({ darkMode, onViewStation }) {
           </View>
         )}
 
-        {!seleccionado && (
-          <View style={[e.leyenda, { backgroundColor: darkMode ? 'rgba(9,9,11,0.85)' : 'rgba(255,255,255,0.92)', borderColor: t.borde }]}>
-            {['low', 'medium', 'full', 'unknown'].map((k, i) => (
-              <View key={k} style={e.leyendaFila}>
-                <View style={[e.punto, { backgroundColor: STATUS_META[k].color }]} />
-                <Text style={{ fontSize: 10, fontWeight: '500', color: t.textoCampo }}>
-                  {['Verde', 'Amarillo', 'Rojo', 'Gris'][i]} · {STATUS_META[k].label}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
+        {!seleccionado && <LeyendaMapa darkMode={darkMode} />}
 
         {seleccionado && (
           <View style={[e.tarjeta, { backgroundColor: darkMode ? 'rgba(24,24,27,0.97)' : 'rgba(255,255,255,0.97)', borderColor: t.borde }]}>
@@ -155,9 +145,6 @@ const e = StyleSheet.create({
   aviso: { zIndex: 10, position: 'absolute', top: 12, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 999, padding: 8 },
   banner: { zIndex: 10, position: 'absolute', top: 12, left: 12, right: 12, borderRadius: 12, padding: 10 },
   botonUbicacion: { zIndex: 10, position: 'absolute', right: 12, top: 60, width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  leyenda: { zIndex: 10, position: 'absolute', left: 12, bottom: 12, borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, gap: 4 },
-  leyendaFila: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  punto: { width: 10, height: 10, borderRadius: 5 },
   tarjeta: { zIndex: 10, position: 'absolute', left: 12, right: 12, bottom: 12, borderRadius: 16, borderWidth: 1, padding: 16 },
   cerrar: { position: 'absolute', top: 10, right: 10, padding: 4, zIndex: 2 },
   filaEntre: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },

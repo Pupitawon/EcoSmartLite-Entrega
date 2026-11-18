@@ -21,32 +21,33 @@ import LogrosScreen from './src/screens/LogrosScreen';
 import RankingScreen from './src/screens/RankingScreen';
 import DesafiosScreen from './src/screens/DesafiosScreen';
 
-import { AlertTriangle, Boxes, ChartColumn, ClipboardList, MessageSquareWarning } from 'lucide-react-native';
+import { AlertTriangle, ChartColumn, ClipboardList, MapPin, MessageSquareWarning } from 'lucide-react-native';
 import { AdminDataProvider } from './src/admin/AdminData';
-import ContenedoresScreen from './src/screens/admin/ContenedoresScreen';
+import MapaAdminScreen from './src/screens/admin/MapaAdminScreen';
+import PerfilAdminScreen from './src/screens/admin/PerfilAdminScreen';
 import AlertasScreen from './src/screens/admin/AlertasScreen';
 import ReportesScreen from './src/screens/admin/ReportesScreen';
 import OrdenesScreen from './src/screens/admin/OrdenesScreen';
 import IndicadoresScreen from './src/screens/admin/IndicadoresScreen';
 
 // Pestañas del administrador (Innova Recicla). Reemplazan al antiguo panel web del backend.
-// Cerrar sesión está en Configuración (avatar del encabezado), con confirmación.
+// El avatar del encabezado abre Mi perfil → Configuración (ahí está cerrar sesión, con confirmación).
 const ADMIN_ITEMS = [
-  { id: 'contenedores', icon: Boxes, label: 'Panel' },
+  { id: 'mapa', icon: MapPin, label: 'Mapa' },
   { id: 'alertas', icon: AlertTriangle, label: 'Alertas' },
   { id: 'reportes', icon: MessageSquareWarning, label: 'Reportes' },
   { id: 'ordenes', icon: ClipboardList, label: 'Órdenes' },
   { id: 'indicadores', icon: ChartColumn, label: 'Datos' },
 ];
 const ADMIN_PANTALLAS = {
-  contenedores: ContenedoresScreen,
+  mapa: MapaAdminScreen,
   alertas: AlertasScreen,
   reportes: ReportesScreen,
   ordenes: OrdenesScreen,
   indicadores: IndicadoresScreen,
 };
 
-const inicioDe = (p) => (p?.es_admin ? 'contenedores' : 'mapa');
+const inicioDe = () => 'mapa'; // el ciudadano y el admin empiezan en su mapa
 
 export default function App() {
   const [darkMode, setDarkMode] = useState(true); // como la app de Jeremy
@@ -55,7 +56,7 @@ export default function App() {
   const [estacion, setEstacion] = useState(null);
   const [iniciando, setIniciando] = useState(true);
   const [racha, setRacha] = useState(0); // días seguidos reciclando, para la barra superior
-  const [adminPrevia, setAdminPrevia] = useState('contenedores'); // pestaña a la que vuelve el admin al salir de Configuración
+  const [adminPrevia, setAdminPrevia] = useState('mapa'); // pestaña a la que vuelve el admin al salir de Mi perfil
   const t = temaDe(darkMode);
 
   // Restaura la sesión guardada (solo la primera vez que Firebase informa el estado).
@@ -104,16 +105,24 @@ export default function App() {
         : <LoginScreen darkMode={darkMode} onLogin={entrar} onGoToRegister={() => setPantalla('registro')} onGoToRecuperar={() => setPantalla('recuperar')} />;
   } else if (perfil.es_admin) {
     // Administrador: el backend lo reconoce por su UID (ADMIN_UIDS) y lo indica en /api/usuarios/me.
-    const Pantalla = ADMIN_PANTALLAS[pantalla] || ContenedoresScreen;
+    const Pantalla = ADMIN_PANTALLAS[pantalla] || MapaAdminScreen;
     contenido = (
-      // El proveedor sigue montado en Configuración para no perder ni recargar los datos del panel.
+      // El proveedor sigue montado en Mi perfil y Configuración para no perder ni recargar los datos del panel.
       <AdminDataProvider darkMode={darkMode} onIrA={setPantalla}>
-        {pantalla === 'configuracion' ? (
+        {pantalla === 'perfil' ? (
+          <PerfilAdminScreen
+            perfil={perfil}
+            darkMode={darkMode}
+            onVolver={() => setPantalla(adminPrevia)}
+            onConfiguracion={() => setPantalla('configuracion')}
+            onIrA={setPantalla}
+          />
+        ) : pantalla === 'configuracion' ? (
           <ConfiguracionScreen
             perfil={perfil}
             darkMode={darkMode}
             toggleDarkMode={() => setDarkMode((d) => !d)}
-            onVolver={() => setPantalla(adminPrevia)}
+            onVolver={() => setPantalla('perfil')}
             onSalir={salir}
           />
         ) : (
@@ -123,14 +132,14 @@ export default function App() {
               toggleDarkMode={() => setDarkMode((d) => !d)}
               inicial="A"
               admin
-              onPerfil={() => { setAdminPrevia(ADMIN_PANTALLAS[pantalla] ? pantalla : 'contenedores'); setPantalla('configuracion'); }}
+              onPerfil={() => { setAdminPrevia(ADMIN_PANTALLAS[pantalla] ? pantalla : 'mapa'); setPantalla('perfil'); }}
             />
             <View style={{ flex: 1 }}>
               <Pantalla />
             </View>
             <BottomNav
               items={ADMIN_ITEMS}
-              active={ADMIN_PANTALLAS[pantalla] ? pantalla : 'contenedores'}
+              active={ADMIN_PANTALLAS[pantalla] ? pantalla : 'mapa'}
               darkMode={darkMode}
               onNavigate={setPantalla}
             />

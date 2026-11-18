@@ -10,7 +10,7 @@ const logoOscuro = require('../../assets/logos/logo-ecosmart-oscuro.png');
  * Encabezado con racha, EcoPuntos, tema y perfil. Cada elemento muestra un globo pequeño que explica qué es:
  * - Computador: al pasar el cursor por encima; se va al sacarlo.
  * - Celular: al mantener presionado (y al tocar racha o EcoPuntos); se va al tocar en otro lado o a los 3,5 s.
- * Con `admin` no se muestran racha ni EcoPuntos (el administrador no recicla) y el avatar abre Configuración.
+ * Con `admin` no se muestran racha ni EcoPuntos (el administrador no recicla).
  */
 export default function Header({ darkMode, toggleDarkMode, inicial, onPerfil, racha = 0, ecopoints = 0, admin = false }) {
   const t = temaDe(darkMode);
@@ -40,7 +40,7 @@ export default function Header({ darkMode, toggleDarkMode, inicial, onPerfil, ra
     racha: racha > 0 ? `Racha: llevas ${racha} ${racha === 1 ? 'día' : 'días'} seguidos reciclando` : 'Racha: recicla hoy para empezar una',
     ecopoints: 'Tus EcoPuntos disponibles',
     tema: darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro',
-    perfil: admin ? 'Configuración' : 'Mi perfil',
+    perfil: 'Mi perfil',
   };
 
   // Envuelve un elemento y le agrega el globo.
@@ -87,7 +87,7 @@ export default function Header({ darkMode, toggleDarkMode, inicial, onPerfil, ra
           <Pressable
             onPress={onPerfil}
             {...eventos('perfil', false)}
-            accessibilityLabel={admin ? 'Abrir configuración' : 'Abrir mi perfil'}
+            accessibilityLabel="Abrir mi perfil"
             style={[
               e.avatar,
               { backgroundColor: darkMode ? '#27272a' : '#d1fae5', borderColor: darkMode ? '#10b981' : '#059669' },

@@ -93,5 +93,25 @@ export function sugerenciaOrden(c, tipoReporte, cr) {
   return { tipo, prioridad };
 }
 
+/**
+ * Números de "Mi perfil" del admin: lo que espera su atención. Las órdenes abiertas son todas menos las Cerradas.
+ * Mientras no se hayan cargado los datos devuelve null (se muestra "—"), para no decir "0 pendientes" sin saberlo.
+ */
+export function resumenAdmin({ alertas, reportes, ordenes, cargado = true } = {}) {
+  if (!cargado) return { alertasPendientes: null, reportesPendientes: null, ordenesAbiertas: null };
+  return {
+    alertasPendientes: (alertas || []).filter((a) => a.estado_alerta === 'pendiente').length,
+    reportesPendientes: (reportes || []).filter((r) => r.estado_revision === 'pendiente').length,
+    ordenesAbiertas: (ordenes || []).filter((o) => o.estado !== 'Cerrada').length,
+  };
+}
+
+/**
+ * Aviso sobre el mapa cuando el servidor deja de responder después de la primera carga:
+ * los pines siguen ahí, pero con los últimos datos conocidos. Antes de la primera carga avisa EstadoCarga.
+ */
+export const avisoConexion = ({ cargado, error }) =>
+  cargado && error ? 'No se pudo actualizar: se muestran los últimos datos. Reintentando…' : null;
+
 /** Color con transparencia (#rrggbb + alfa). */
 export const suave = (hex, alfa = '26') => `${hex}${alfa}`;

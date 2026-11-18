@@ -1,24 +1,21 @@
 import { useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
-import { AlertTriangle, Boxes, ChevronRight, Gauge, MessageSquareWarning, Search, WifiOff } from 'lucide-react-native';
-import { temaDe } from '../../tema';
-import { useAdminData } from '../../admin/AdminData';
-import { EstadoCarga, Etiqueta, Filtros, Indicador, PantallaAdmin, Progreso, Tarjeta, Vacio } from '../../admin/ui';
-import { COLOR, hace, material, ubicacion } from '../../admin/utils';
+import { ChevronRight, MessageSquareWarning, Search, WifiOff } from 'lucide-react-native';
+import { temaDe } from '../tema';
+import { useAdminData } from './AdminData';
+import { EstadoCarga, Etiqueta, Filtros, Progreso, Tarjeta, Vacio } from './ui';
+import { COLOR, hace, material, ubicacion } from './utils';
 
 /**
- * Contenedores (RF-01 Monitoreo): resumen, búsqueda, filtros y detalle de cada contenedor.
+ * Lista de contenedores (RF-01 Monitoreo): búsqueda, filtros y detalle de cada uno.
+ * Es el modo "Lista" de la pestaña Mapa; los indicadores generales están en Datos.
  */
-export default function ContenedoresScreen() {
-  const { contenedores, cr, cargado, reportes, ahora, config, darkMode, abrirDetalle } = useAdminData();
+export default function ListaContenedores() {
+  const { contenedores, cr, cargado, reportes, ahora, darkMode, abrirDetalle } = useAdminData();
   const t = temaDe(darkMode);
   const [filtro, setFiltro] = useState('todos');
   const [busqueda, setBusqueda] = useState('');
 
-  const conLectura = contenedores.filter((c) => !cr.sinLectura(c));
-  const promedio = conLectura.length
-    ? Math.round(conLectura.reduce((s, c) => s + c.porcentaje_llenado, 0) / conLectura.length)
-    : null;
   const pendientesDe = (id) => reportes.filter((r) => r.id_contenedor === id && r.estado_revision === 'pendiente').length;
   const cuenta = (f) => contenedores.filter(f).length;
 
@@ -33,17 +30,10 @@ export default function ContenedoresScreen() {
   });
 
   return (
-    <PantallaAdmin icono={Boxes} titulo="Contenedores">
+    <>
       <EstadoCarga />
       {cargado && (
         <>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Indicador icono={Boxes} valor={contenedores.length} etiqueta="Contenedores" color={COLOR.verde} />
-            <Indicador icono={AlertTriangle} valor={cuenta(cr.enAlerta)} etiqueta={`En alerta ≥${config.umbral_alerta}%`} color={COLOR.rojo} />
-            <Indicador icono={WifiOff} valor={cuenta(cr.sinConexion)} etiqueta="Sin conexión" color={COLOR.ambar} />
-            <Indicador icono={Gauge} valor={promedio === null ? '—' : `${promedio}%`} etiqueta="Llenado prom." color={COLOR.azul} />
-          </View>
-
           <View
             style={{
               flexDirection: 'row',
@@ -120,6 +110,6 @@ export default function ContenedoresScreen() {
           )}
         </>
       )}
-    </PantallaAdmin>
+    </>
   );
 }

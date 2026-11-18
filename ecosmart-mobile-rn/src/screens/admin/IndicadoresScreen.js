@@ -1,15 +1,20 @@
-import { Text } from 'react-native';
-import { ChartColumn } from 'lucide-react-native';
+import { Text, View } from 'react-native';
+import { AlertTriangle, Boxes, ChartColumn, Gauge, WifiOff } from 'lucide-react-native';
 import { temaDe } from '../../tema';
 import { useAdminData } from '../../admin/AdminData';
-import { Barra, EstadoCarga, PantallaAdmin, Tarjeta } from '../../admin/ui';
+import { Barra, EstadoCarga, Indicador, PantallaAdmin, Tarjeta } from '../../admin/ui';
 import { COLOR, COLOR_REPORTE, ESTADO_REPORTE } from '../../admin/utils';
 
-/** Indicadores operativos con los datos actuales. */
+/** Indicadores operativos con los datos actuales (los 4 de arriba estaban antes en Panel). */
 export default function IndicadoresScreen() {
-  const { contenedores: l, alertas, reportes, ordenes, cr, cargado, darkMode } = useAdminData();
+  const { contenedores: l, alertas, reportes, ordenes, cr, cargado, config, darkMode } = useAdminData();
   const t = temaDe(darkMode);
   const total = l.length;
+  const conLectura = l.filter((c) => !cr.sinLectura(c));
+  const promedio = conLectura.length
+    ? Math.round(conLectura.reduce((s, c) => s + c.porcentaje_llenado, 0) / conLectura.length)
+    : null;
+  const cuenta = (f) => l.filter(f).length;
 
   const normal = (c) => !cr.sinLectura(c) && !cr.enAlerta(c);
   const activas = alertas.filter((a) => a.estado_alerta === 'pendiente').length;
@@ -32,6 +37,13 @@ export default function IndicadoresScreen() {
       <EstadoCarga />
       {cargado && (
         <>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Indicador icono={Boxes} valor={total} etiqueta="Contenedores" color={COLOR.verde} />
+            <Indicador icono={AlertTriangle} valor={cuenta(cr.enAlerta)} etiqueta={`En alerta ≥${config.umbral_alerta}%`} color={COLOR.rojo} />
+            <Indicador icono={WifiOff} valor={cuenta(cr.sinConexion)} etiqueta="Sin conexión" color={COLOR.ambar} />
+            <Indicador icono={Gauge} valor={promedio === null ? '—' : `${promedio}%`} etiqueta="Llenado prom." color={COLOR.azul} />
+          </View>
+
           <Tarjeta style={panel}>
             {titulo('Estado de los contenedores')}
             {total ? (

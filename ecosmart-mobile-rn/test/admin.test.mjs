@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { pinesDe } from '../src/utils/pines.js';
-import { resumenAdmin } from '../src/admin/utils.js';
+import { avisoConexion, resumenAdmin } from '../src/admin/utils.js';
 
 test('pinesDe descarta contenedores sin coordenadas', () => {
   const pines = pinesDe([
@@ -24,4 +24,16 @@ test('resumenAdmin cuenta solo lo pendiente', () => {
 
 test('resumenAdmin con listas vacías o undefined', () => {
   assert.deepEqual(resumenAdmin({ alertas: [], reportes: undefined }), { alertasPendientes: 0, reportesPendientes: 0, ordenesAbiertas: 0 });
+});
+
+test('resumenAdmin sin datos cargados no muestra ceros falsos', () => {
+  assert.deepEqual(resumenAdmin({ alertas: [], reportes: [], ordenes: [], cargado: false }), {
+    alertasPendientes: null, reportesPendientes: null, ordenesAbiertas: null,
+  });
+});
+
+test('avisoConexion avisa cuando el servidor falla después de la primera carga', () => {
+  assert.equal(avisoConexion({ cargado: true, error: null }), null);
+  assert.equal(avisoConexion({ cargado: false, error: 'timeout' }), null); // ahí ya avisa EstadoCarga
+  assert.match(avisoConexion({ cargado: true, error: 'timeout' }), /No se pudo actualizar/);
 });

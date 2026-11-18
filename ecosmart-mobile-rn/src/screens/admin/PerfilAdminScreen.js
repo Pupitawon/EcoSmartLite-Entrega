@@ -10,8 +10,8 @@ import { temaDe } from '../../tema';
  */
 export default function PerfilAdminScreen({ perfil, darkMode, onVolver, onConfiguracion, onIrA }) {
   const t = temaDe(darkMode);
-  const { alertas, reportes, ordenes } = useAdminData();
-  const r = resumenAdmin({ alertas, reportes, ordenes });
+  const { alertas, reportes, ordenes, cargado } = useAdminData();
+  const r = resumenAdmin({ alertas, reportes, ordenes, cargado });
 
   const datos = [
     { id: 'alertas', n: r.alertasPendientes, Icono: AlertTriangle, color: COLOR.rojo, uno: 'alerta pendiente', varios: 'alertas pendientes' },
@@ -51,11 +51,13 @@ export default function PerfilAdminScreen({ perfil, darkMode, onVolver, onConfig
           <Pressable
             key={id}
             onPress={() => onIrA(id)}
-            accessibilityLabel={`${n} ${n === 1 ? uno : varios}`}
+            accessibilityRole="button"
+            accessibilityLabel={n === null ? `${varios}: cargando` : `${n} ${n === 1 ? uno : varios}`}
             style={[e.dato, { backgroundColor: t.superficie, borderColor: t.borde }]}
           >
             <Icono size={22} color={color} />
-            <Text style={{ color: t.texto, fontSize: 20, fontWeight: '800' }}>{n}</Text>
+            {/* Sin datos todavía se muestra "—" y no un 0 que haría creer que no hay nada pendiente */}
+            <Text style={{ color: t.texto, fontSize: 20, fontWeight: '800' }}>{n === null ? '—' : n}</Text>
             <Text style={{ color: t.textoSuave, fontSize: 12, textAlign: 'center' }}>{n === 1 ? uno : varios}</Text>
           </Pressable>
         ))}

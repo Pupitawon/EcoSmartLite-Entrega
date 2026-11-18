@@ -8,19 +8,7 @@ import useContenedores from '../hooks/useContenedores';
 import useUbicacion from '../hooks/useUbicacion';
 import { distanciaMetros, textoDistancia } from '../utils/distancia';
 import { STATUS_META, getPinStatus, horaLocal, temaDe } from '../tema';
-
-// Contenedor del backend -> pin del mapa. id_contenedor es lo que necesita el reporte ciudadano.
-const aPin = (c) => ({
-  id_contenedor: c.id_contenedor,
-  name: `Contenedor #${c.id_contenedor}`,
-  category: c.nombre_material || null,
-  lat: c.latitud,
-  lng: c.longitud,
-  fill: Math.round(c.porcentaje_llenado),
-  address: c.direccion || null,
-  sinReporte: Boolean(c.sin_reporte),
-  ultimaLectura: c.fecha_ultima_lectura || null,
-});
+import { pinesDe } from '../utils/pines';
 
 export default function MapaScreen({ darkMode, onViewStation }) {
   const t = temaDe(darkMode);
@@ -30,10 +18,7 @@ export default function MapaScreen({ darkMode, onViewStation }) {
   const [centrar, setCentrar] = useState(0); // cada toque al botón lleva el mapa al usuario
   const irAMiUbicacion = () => (posicion ? setCentrar((n) => n + 1) : reintentar());
 
-  const pins = useMemo(
-    () => contenedores.filter((c) => c.latitud != null && c.longitud != null).map(aPin),
-    [contenedores]
-  );
+  const pins = useMemo(() => pinesDe(contenedores), [contenedores]);
   // Se busca por id para que la tarjeta se actualice sola cuando llega un % nuevo.
   const seleccionado = pins.find((p) => p.id_contenedor === seleccionadoId) || null;
   const meta = seleccionado ? STATUS_META[getPinStatus(seleccionado)] : null;

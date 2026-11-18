@@ -93,5 +93,14 @@ export function sugerenciaOrden(c, tipoReporte, cr) {
   return { tipo, prioridad };
 }
 
+/** Números de "Mi perfil" del admin: lo que espera su atención. Las órdenes abiertas son todas menos las Cerradas. */
+export function resumenAdmin({ alertas, reportes, ordenes } = {}) {
+  return {
+    alertasPendientes: (alertas || []).filter((a) => a.estado_alerta === 'pendiente').length,
+    reportesPendientes: (reportes || []).filter((r) => r.estado_revision === 'pendiente').length,
+    ordenesAbiertas: (ordenes || []).filter((o) => o.estado !== 'Cerrada').length,
+  };
+}
+
 /** Color con transparencia (#rrggbb + alfa). */
 export const suave = (hex, alfa = '26') => `${hex}${alfa}`;

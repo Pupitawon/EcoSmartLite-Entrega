@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Circle, MapContainer, Marker, TileLayer, useMap } from 'react-leaflet';
+import { Circle, MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { CALAMA, STATUS_META, getPinStatus } from '../tema';
@@ -37,8 +37,24 @@ function Centrador({ posicion, centrar }) {
   return null;
 }
 
+// Lleva el mapa a `centro` cada vez que cambia (ej. el contenedor del detalle o el punto nuevo al moverlo).
+function Enfoque({ centro }) {
+  const mapa = useMap();
+  useEffect(() => {
+    if (centro) mapa.setView([centro.lat, centro.lng], Math.max(mapa.getZoom(), 16));
+  }, [centro?.lat, centro?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
+  return null;
+}
+
+// Avisa dónde se tocó el mapa (para elegir la ubicación nueva de un contenedor).
+function Toque({ onToqueMapa }) {
+  useMapEvents({ click: (e) => onToqueMapa(e.latlng.lat, e.latlng.lng) });
+  return null;
+}
+
 // posicion: { lat, lng, precision } del usuario (o null).
-export default function MapaView({ pins, darkMode, seleccionado, onSelect, posicion, centrar }) {
+// centro (opcional): { lat, lng } en que se enfoca el mapa. onToqueMapa (opcional): (lat, lng) al tocar el mapa.
+export default function MapaView({ pins, darkMode, seleccionado, onSelect, posicion, centrar, centro, onToqueMapa }) {
   useEffect(() => {
     const estilo = document.createElement('style');
     estilo.textContent = CSS_OSCURO;
@@ -50,12 +66,18 @@ export default function MapaView({ pins, darkMode, seleccionado, onSelect, posic
     // zIndex 0 + isolation crean un contexto de apilamiento propio: los paneles de Leaflet (z-index 200 a 1000)
     // quedan encerrados aquí y la leyenda y la tarjeta del pin se dibujan por encima del mapa.
     <div className={darkMode ? 'eco-mapa-oscuro' : ''} style={{ position: 'absolute', inset: 0, zIndex: 0, isolation: 'isolate' }}>
-      <MapContainer center={[CALAMA.latitude, CALAMA.longitude]} zoom={13} style={{ width: '100%', height: '100%' }}>
+      <MapContainer
+        center={centro ? [centro.lat, centro.lng] : [CALAMA.latitude, CALAMA.longitude]}
+        zoom={centro ? 16 : 13}
+        style={{ width: '100%', height: '100%', cursor: onToqueMapa ? 'crosshair' : undefined }}
+      >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <Centrador posicion={posicion} centrar={centrar} />
+        <Enfoque centro={centro} />
+        {onToqueMapa ? <Toque onToqueMapa={onToqueMapa} /> : null}
         {posicion && (
           <>
             {posicion.precision != null && posicion.precision < 500 && (
@@ -76,7 +98,7 @@ export default function MapaView({ pins, darkMode, seleccionado, onSelect, posic
               key={`${pin.id_contenedor}-${color}-${activo}-${darkMode}`}
               position={[pin.lat, pin.lng]}
               icon={icono(color, darkMode, activo)}
-              eventHandlers={{ click: () => onSelect(pin) }}
+              eventHandlers={{ click: () => onSelect?.(pin) }}
             />
           );
         })}

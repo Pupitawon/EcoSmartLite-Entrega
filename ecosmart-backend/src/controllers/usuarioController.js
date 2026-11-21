@@ -1,5 +1,5 @@
 const { z } = require('zod');
-const { esAdmin } = require('../middleware/adminAuth');
+const { rolDe } = require('../services/rolService');
 const pool = require('../config/db');
 const config = require('../config/config');
 const { resumenInsignias } = require('../services/insigniaService');
@@ -65,7 +65,7 @@ const registrarUsuario = async (req, res) => {
 // Perfil del usuario autenticado (404 si se creó en Firebase pero aún no completó el registro).
 const miPerfil = async (req, res) => {
   try {
-    const admin = esAdmin(req.user.uid);
+    const admin = (await rolDe(req.user.uid)).esAdmin;
     const r = await pool.query(`SELECT ${COLUMNAS} FROM usuario WHERE id_auth = $1`, [req.user.uid]);
     if (!r.rows[0]) {
       // Un administrador puede no tener perfil de ciudadano (RUT, EcoPoints): igual puede entrar.
@@ -96,7 +96,7 @@ const actualizarPreferencias = async (req, res) => {
       [req.user.uid, parsed.data.recibe_notificaciones]
     );
     if (!r.rows[0]) return res.status(404).json({ error: 'perfil_no_encontrado' });
-    res.json({ usuario: { ...r.rows[0], es_admin: esAdmin(req.user.uid) } });
+    res.json({ usuario: { ...r.rows[0], es_admin: (await rolDe(req.user.uid)).esAdmin } });
   } catch (err) {
     console.error('Error al actualizar preferencias:', err.message);
     res.status(500).json({ error: 'error_interno' });

@@ -6,7 +6,7 @@ const { requireAdmin } = require('../middleware/adminAuth');
 
 router.post('/', requireFirebaseUser, postReporte);
 router.get('/', getReportes); // ?estado=pendiente|en_revision|resuelto|descartado
-// Solo administradores (ADMIN_UIDS) cambian el estado de revisión desde la app.
+// Solo administradores (súper usuario, ADMIN_UIDS o tabla administrador) cambian el estado de revisión desde la app.
 router.patch('/:id', requireFirebaseUser, requireAdmin, patchReporte);
 
 module.exports = router;

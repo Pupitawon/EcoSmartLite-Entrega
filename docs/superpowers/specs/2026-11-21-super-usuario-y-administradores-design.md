@@ -85,7 +85,7 @@ RLS activado sin políticas (igual que el resto).
     3. Inserta la fila con el UID devuelto.
     4. `modo: 'enlace'` → `sendOobCode` PASSWORD_RESET. `modo: 'temporal'` → responde `clave_temporal` **una sola vez** y guarda `debe_cambiar_clave = true`.
   - `PATCH /api/administradores/:id` `{ activo }` → desactivar/reactivar (efecto inmediato).
-  - `POST /api/administradores/:id/reenviar` → vuelve a enviar "crea tu contraseña"; solo para filas activas; pone `debe_cambiar_clave = false` (al usar el enlace define su propia contraseña).
+  - `POST /api/administradores/:id/reenviar` → vuelve a enviar "crea tu contraseña"; solo para filas activas. **No** libera `debe_cambiar_clave`: Firebase no invalida la temporal hasta que se usa el enlace (cambio tras la revisión final). Si definió su contraseña con el enlace, al entrar la usa como "actual" y elige otra.
 
 ### App
 - **Mi perfil del súper usuario:** fila "Administradores" → `AdministradoresScreen`:

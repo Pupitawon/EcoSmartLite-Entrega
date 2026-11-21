@@ -23,7 +23,7 @@ export default function CambiarClaveObligatoriaScreen({ darkMode, onListo, onSal
     if (!f.actual || !f.nueva || !f.repetir) return setError('Completa los tres campos.');
     if (!claveValida(f.nueva)) return setError('La nueva contraseña no cumple todos los requisitos.');
     if (f.nueva !== f.repetir) return setError('Las contraseñas nuevas no coinciden.');
-    if (f.nueva === f.actual) return setError('La nueva contraseña debe ser distinta de la temporal.');
+    if (f.nueva === f.actual) return setError('La nueva contraseña debe ser distinta de la actual.');
     setGuardando(true);
     try {
       await cambiarClave(f.actual, f.nueva);
@@ -42,10 +42,10 @@ export default function CambiarClaveObligatoriaScreen({ darkMode, onListo, onSal
         <KeyRound size={40} color={t.acento} />
         <Text style={{ color: t.texto, fontWeight: '800', fontSize: 20, marginTop: 10 }}>Crea tu contraseña</Text>
         <Text style={{ color: t.textoSuave, fontSize: 13, textAlign: 'center', marginTop: 6 }}>
-          Entraste con una contraseña temporal. Antes de usar el panel, reemplázala por una que solo tú conozcas.
+          Tu cuenta se creó con una contraseña temporal. Antes de usar el panel, elige una que solo tú conozcas.
         </Text>
       </View>
-      <Campo darkMode={darkMode} Icono={Lock} etiqueta="Contraseña temporal" value={f.actual} onChangeText={set('actual')} secureTextEntry placeholder="La que te entregaron" />
+      <Campo darkMode={darkMode} Icono={Lock} etiqueta="Contraseña actual" value={f.actual} onChangeText={set('actual')} secureTextEntry placeholder="La temporal, o la que creaste con el enlace" />
       <Campo darkMode={darkMode} Icono={Lock} etiqueta="Contraseña nueva" value={f.nueva} onChangeText={set('nueva')} secureTextEntry placeholder="Mínimo 8 caracteres" />
       <RequisitosClave clave={f.nueva} darkMode={darkMode} />
       <Campo darkMode={darkMode} Icono={Lock} etiqueta="Repite la contraseña nueva" value={f.repetir} onChangeText={set('repetir')} secureTextEntry onSubmitEditing={guardar} returnKeyType="done" placeholder="••••••••" />

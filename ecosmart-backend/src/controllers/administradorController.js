@@ -131,7 +131,11 @@ const cambiarActivo = async (req, res) => {
   }
 };
 
-// Vuelve a enviar "crea tu contraseña". Como con el enlace define su propia contraseña, ya no debe cambiar la temporal.
+/**
+ * Vuelve a enviar "crea tu contraseña". NO libera la contraseña temporal: Firebase no la invalida hasta que
+ * se usa el enlace, y quien vio la temporal podría seguir entrando. Si el admin define su contraseña con el
+ * enlace, al entrar la app le pide esa contraseña como "actual" y una nueva, y ahí se libera.
+ */
 const reenviar = async (req, res) => {
   const id = idDe(req);
   if (!id) return res.status(422).json({ error: 'id_invalido' });
@@ -145,10 +149,6 @@ const reenviar = async (req, res) => {
       console.error('Error de Firebase al reenviar el correo:', err.message);
       return res.status(502).json({ error: 'firebase_error', mensaje: 'Firebase no respondió. Inténtalo de nuevo.' });
     }
-    await pool.query(
-      `UPDATE administrador SET debe_cambiar_clave = FALSE, fecha_actualizacion = ${UTC_NOW} WHERE id_admin = $1`,
-      [id]
-    );
     res.json({ ok: true });
   } catch (err) {
     console.error('Error al reenviar el correo:', err.message);

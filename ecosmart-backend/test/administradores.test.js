@@ -144,7 +144,7 @@ test('dos creaciones iguales a la vez: una 201 y otra 409', async () => {
   assert.equal((await pool.query("SELECT 1 FROM administrador WHERE correo = 'doble@adm.test'")).rowCount, 1);
 });
 
-test('desactivar quita el acceso al instante; reactivar lo devuelve; reenviar limpia el flag', async () => {
+test('desactivar quita el acceso al instante; reactivar lo devuelve; reenviar no libera la temporal', async () => {
   const { administrador } = await (await pedir('', { method: 'POST', body: datos('ciclo@adm.test', 'temporal') })).json();
   const id = administrador.id_admin;
   const uid = administrador.id_auth;
@@ -168,8 +168,9 @@ test('desactivar quita el acceso al instante; reactivar lo devuelve; reenviar li
   const re = await pedir(`/${id}/reenviar`, { method: 'POST' });
   assert.equal(re.status, 200);
   assert.deepEqual(llamadas.map((l) => l.metodo), ['sendOobCode']);
+  // Reenviar NO libera la contraseña temporal: Firebase no la invalida hasta que se usa el enlace.
   const fila = await pool.query('SELECT debe_cambiar_clave FROM administrador WHERE id_admin = $1', [id]);
-  assert.equal(fila.rows[0].debe_cambiar_clave, false);
+  assert.equal(fila.rows[0].debe_cambiar_clave, true);
 
   assert.equal((await pedir('/999999', { method: 'PATCH', body: { activo: false } })).status, 404);
   assert.equal((await pedir(`/${id}`, { method: 'PATCH', body: { activo: 'no' } })).status, 422);

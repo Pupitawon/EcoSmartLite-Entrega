@@ -4,7 +4,7 @@ const { getOrdenes, postOrden, patchAvanzar, deleteOrden } = require('../control
 const { requireFirebaseUser } = require('../middleware/firebaseAuth');
 const { requireAdmin } = require('../middleware/adminAuth');
 
-// Órdenes de trabajo: solo administradores (ADMIN_UIDS), también para leerlas.
+// Órdenes de trabajo: solo administradores (súper usuario, ADMIN_UIDS o tabla administrador), también para leerlas.
 router.use(requireFirebaseUser, requireAdmin);
 
 router.get('/', getOrdenes);

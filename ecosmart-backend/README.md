@@ -19,6 +19,7 @@ cp .env.example .env        # completa DATABASE_URL e INGEST_API_KEY
    **Reportes ciudadanos (una vez):** ejecuta `sql/03_migracion_reportes.sql` (id autogenerado en `reporte_anomalia`, columnas `tipo_anomalia` y `fecha_revision`).
    **Seguridad (una vez):** `sql/04_seguridad_rls.sql` activa RLS (la API REST de Supabase no expone las tablas; el backend entra con el rol `postgres`).
    **Órdenes de trabajo (una vez):** `sql/05_ordenes_trabajo.sql` crea la tabla `orden_trabajo`.
+   **Administradores (una vez):** `sql/07_administradores.sql` crea la tabla `administrador` (la gestiona el súper usuario desde la app).
    **Depósitos por QR (una vez):** `sql/06_depositos_qr.sql` crea `configuracion_sistema`, `contenedor.codigo_qr`, las columnas de `deposito_residuo` y la función `registrar_deposito` (depósito + saldo + insignias en una transacción).
 3. En `.env` define `FIREBASE_PROJECT_ID` (el Project ID de tu proyecto Firebase).
 4. `npm run dev` (o `npm start`) → http://localhost:5000
@@ -27,10 +28,16 @@ cp .env.example .env        # completa DATABASE_URL e INGEST_API_KEY
 
 Ya no hay panel web: la administración está en `ecosmart-mobile-rn`. Al iniciar sesión con una cuenta de administrador, la app muestra Contenedores, Alertas, Reportes ciudadanos, Órdenes de trabajo e Indicadores, y se actualiza sola cada 15 s.
 
-**Quién es administrador:** las cuentas de Firebase cuyo UID está en `ADMIN_UIDS` (en el `.env`, separados por coma). `GET /api/usuarios/me` devuelve `es_admin: true` para ellas, aunque no tengan perfil de ciudadano. El UID se copia desde Firebase → Authentication → Usuarios.
+**Quién es administrador:**
+- **Súper usuario:** su UID está en `SUPER_UIDS`. También es admin y es el único que crea, desactiva y reactiva administradores desde la app (Mi perfil → Administradores).
+- **Administradores:** filas activas de la tabla `administrador`. Al crear uno, el backend crea su cuenta de Firebase y le envía el correo "crea tu contraseña" (o entrega una contraseña temporal que debe cambiar al entrar). Si el correo ya tiene cuenta, se rechaza.
+- `ADMIN_UIDS` sigue funcionando para los administradores antiguos.
+
+`GET /api/usuarios/me` devuelve `es_admin` y `es_super`, aunque no tengan perfil de ciudadano. El UID se copia desde Firebase → Authentication → Usuarios.
 
 ```env
-ADMIN_UIDS=AbCdEf123...,OtroUid456...
+SUPER_UIDS=AbCdEf123...
+ADMIN_UIDS=OtroUid456...
 ```
 
 Las órdenes de trabajo se guardan en la tabla `orden_trabajo` (`/api/ordenes`, solo administradores).

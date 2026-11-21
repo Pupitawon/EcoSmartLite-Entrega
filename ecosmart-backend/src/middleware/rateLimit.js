@@ -30,4 +30,13 @@ const limiteDepositos = rateLimit({
   message: { error: 'demasiadas_solicitudes' },
 });
 
-module.exports = { limiteLecturas, limiteRecuperarClave, limiteDepositos };
+// Gestión de administradores (solo súper usuario): suficiente para usar la pantalla, corta la fuerza bruta.
+const limiteAdministradores = rateLimit({
+  windowMs: 60_000,
+  limit: 60,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'demasiadas_solicitudes' },
+});
+
+module.exports = { limiteLecturas, limiteRecuperarClave, limiteDepositos, limiteAdministradores };

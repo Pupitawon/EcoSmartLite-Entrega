@@ -13,8 +13,10 @@ const config = {
   // Quién puede enviar lecturas (ver src/middleware/ingestAuth.js).
   apiKey: process.env.INGEST_API_KEY,
   firebaseProjectId: process.env.FIREBASE_PROJECT_ID || null,
-  // Clave web de Firebase (pública). La usa el backend para pedir el correo de restablecimiento.
+  // Clave web de Firebase (pública). La usa el backend para pedir el correo de restablecimiento y crear cuentas de admin.
   firebaseWebApiKey: process.env.FIREBASE_WEB_API_KEY || null,
+  // API REST de Firebase Auth. Solo se cambia en los tests, para apuntar a un servidor local que la simula.
+  firebaseAuthUrl: (process.env.FIREBASE_AUTH_URL || 'https://identitytoolkit.googleapis.com/v1').replace(/\/$/, ''),
   firebaseJwksUrl:
     process.env.FIREBASE_JWKS_URL ||
     'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com',
@@ -26,6 +28,12 @@ const config = {
   // Administradores (equipo de Innova Recicla): UIDs de Firebase separados por coma.
   // Ven el panel de administración en la app y pueden cambiar el estado de los reportes.
   adminUids: (process.env.ADMIN_UIDS || '')
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean),
+
+  // Súper usuarios: también son admin y son los únicos que crean y desactivan administradores (tabla administrador).
+  superUids: (process.env.SUPER_UIDS || '')
     .split(',')
     .map((x) => x.trim())
     .filter(Boolean),

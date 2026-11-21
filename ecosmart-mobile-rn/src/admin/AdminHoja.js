@@ -153,6 +153,20 @@ function Detalle({ c }) {
 const tieneUbicacion = (c) => c?.latitud != null && c?.longitud != null;
 
 /**
+ * Pide una vez la ubicación del teléfono. Se monta solo mientras se busca (y de nuevo en cada pedido),
+ * así cada búsqueda empieza de cero: no reutiliza la posición ni el error de una búsqueda anterior.
+ */
+function BuscarUbicacion({ onPosicion, onError }) {
+  const { posicion, estado, detalle } = useUbicacion({ activo: true });
+  useEffect(() => {
+    if (posicion) onPosicion(posicion.lat, posicion.lng);
+    else if (estado === 'denegado') onError('Activa el permiso de ubicación para usar tu posición.');
+    else if (estado === 'error') onError(detalle || 'No se pudo obtener tu ubicación.');
+  }, [posicion, estado, detalle]); // eslint-disable-line react-hooks/exhaustive-deps
+  return null;
+}
+
+/**
  * Mover un contenedor: tocar el mapa, usar la ubicación actual del teléfono (cuando se está en el lugar nuevo)
  * o escribir las coordenadas. El ciudadano lo ve en el lugar nuevo apenas se guarda.
  */
@@ -160,33 +174,37 @@ function MoverContenedor({ c }) {
   const { darkMode, moverContenedor, abrirDetalle } = useAdminData();
   const t = temaDe(darkMode);
   const inicial = tieneUbicacion(c) ? { lat: c.latitud, lng: c.longitud } : { lat: CALAMA.latitude, lng: CALAMA.longitude };
-  const [punto, setPunto] = useState(inicial);
+  const [punto, setPunto] = useState(inicial); // dónde quedará el contenedor
+  const [centro, setCentro] = useState(inicial); // dónde mira el mapa: no se mueve al tocar ni con cada tecla
   const [txt, setTxt] = useState({ lat: String(inicial.lat), lng: String(inicial.lng) });
-  const [buscando, setBuscando] = useState(false); // pidiendo la ubicación del teléfono
+  const [pedido, setPedido] = useState(0); // > 0 mientras se pide la ubicación; cada pedido es una búsqueda nueva
   const [error, setError] = useState('');
   const [guardando, setGuardando] = useState(false);
-  const { posicion, estado, detalle } = useUbicacion({ activo: buscando });
 
+  // Tocar el mapa: mueve el pin sin recentrar ni cambiar el zoom que eligió el admin.
   const fijar = (lat, lng) => {
     const p = { lat: Number(lat.toFixed(7)), lng: Number(lng.toFixed(7)) };
     setPunto(p);
     setTxt({ lat: String(p.lat), lng: String(p.lng) });
     setError('');
+    return p;
   };
 
-  // La primera posición que entrega el teléfono se usa como punto nuevo.
-  useEffect(() => {
-    if (!buscando) return;
-    if (posicion) { fijar(posicion.lat, posicion.lng); setBuscando(false); }
-    else if (estado === 'denegado') { setError('Activa el permiso de ubicación para usar tu posición.'); setBuscando(false); }
-    else if (estado === 'error') { setError(detalle || 'No se pudo obtener tu ubicación.'); setBuscando(false); }
-  }, [buscando, posicion, estado, detalle]); // eslint-disable-line react-hooks/exhaustive-deps
+  const usarUbicacion = (lat, lng) => {
+    setCentro(fijar(lat, lng));
+    setPedido(0);
+  };
 
   const escribir = (k) => (v) => {
     const nuevo = { ...txt, [k]: v };
     setTxt(nuevo);
     const r = leerCoordenadas(nuevo.lat, nuevo.lng);
     if (!r.error) { setPunto({ lat: r.latitud, lng: r.longitud }); setError(''); }
+  };
+  // El mapa se lleva al punto escrito al terminar de escribir, no con cada número intermedio.
+  const terminarDeEscribir = () => {
+    const r = leerCoordenadas(txt.lat, txt.lng);
+    if (!r.error) setCentro({ lat: r.latitud, lng: r.longitud });
   };
 
   const guardar = async () => {
@@ -214,14 +232,22 @@ function MoverContenedor({ c }) {
       </Text>
 
       <View style={[e.mapaMover, { borderColor: t.borde }]}>
-        <MapaView pins={[pin]} darkMode={darkMode} seleccionado={pin} posicion={null} centrar={0} centro={punto} onToqueMapa={fijar} />
+        <MapaView pins={[pin]} darkMode={darkMode} seleccionado={pin} posicion={null} centrar={0} centro={centro} onToqueMapa={fijar} />
       </View>
 
       <View style={{ marginTop: 10 }}>
-        <Boton icono={LocateFixed} onPress={() => { setError(''); setBuscando(true); }}>
-          {buscando ? 'Buscando tu ubicación…' : 'Usar mi ubicación actual'}
+        <Boton icono={LocateFixed} onPress={() => { if (!pedido) { setError(''); setPedido(Date.now()); } }}>
+          {pedido ? 'Buscando tu ubicación…' : 'Usar mi ubicación actual'}
         </Boton>
       </View>
+      {/* Se monta de nuevo en cada pedido: nunca reutiliza una posición o un error anterior. */}
+      {pedido ? (
+        <BuscarUbicacion
+          key={pedido}
+          onPosicion={usarUbicacion}
+          onError={(m) => { setError(m); setPedido(0); }}
+        />
+      ) : null}
 
       <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
         {[['lat', 'Latitud'], ['lng', 'Longitud']].map(([k, etiqueta]) => (
@@ -230,6 +256,8 @@ function MoverContenedor({ c }) {
             <TextInput
               value={txt[k]}
               onChangeText={escribir(k)}
+              onBlur={terminarDeEscribir}
+              onSubmitEditing={terminarDeEscribir}
               keyboardType="numbers-and-punctuation"
               accessibilityLabel={etiqueta}
               style={[e.campoCoord, { color: t.texto, borderColor: t.campoBorde, backgroundColor: t.campo }]}

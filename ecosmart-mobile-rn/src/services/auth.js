@@ -38,12 +38,23 @@ export async function registrar({ correo, clave, rut, nombre_completo, recibe_no
   }
 }
 
-/** Devuelve el perfil de la base del usuario autenticado (null si no completó su registro). */
+/**
+ * Devuelve el perfil de la base del usuario autenticado (null si no completó su registro).
+ * Un administrador desactivado recibe { desactivado: true } para que la app le muestre el aviso.
+ */
 export async function obtenerPerfil() {
   const { status, datos } = await llamar('/api/usuarios/me');
   if (status === 200) return datos.usuario;
   if (status === 404) return null;
+  if (status === 403 && datos?.error === 'admin_desactivado') return { desactivado: true };
   throw new Error('No se pudo cargar tu perfil. Inténtalo de nuevo.');
+}
+
+/** El admin con contraseña temporal avisa que ya la cambió (después de cambiarla en Firebase). */
+export async function marcarClaveCambiada() {
+  const { status } = await llamar('/api/usuarios/me/clave-cambiada', { method: 'POST' });
+  if (status === 200) return;
+  throw new Error('Tu contraseña se cambió, pero no se pudo avisar al servidor. Inténtalo de nuevo.');
 }
 
 /** Guarda si el ciudadano quiere recibir notificaciones. Devuelve el perfil actualizado. */

@@ -65,6 +65,8 @@ Content-Type: application/json
 | 422 | Validación: porcentaje fuera de 0–100, tipos incorrectos, campos extra, fecha futura |
 | 429 | Demasiadas solicitudes (`RATE_LIMIT_POR_MINUTO`, 600 por IP) |
 
+**Cambiar la ubicación de un contenedor** (solo administradores): `PATCH /api/contenedores/:id/ubicacion` con `{ "latitud": -22.46, "longitud": -68.93 }` → 200 con el contenedor / 422 coordenadas inválidas o (0, 0) / 404 / 401 / 403.
+
 La ruta antigua `PUT /api/contenedores/:id/nivel` (body `{ "porcentaje_llenado": 82 }`) sigue funcionando y usa **la misma lógica**, pero ahora también exige credencial.
 
 Otras rutas (lectura, públicas): `GET /api/contenedores`, `GET /api/alertas?estado=pendiente|resuelta|duplicada`, `GET /api/alertas/pendientes`, `GET /api/config`, y `GET /api/stream` (Server-Sent Events).

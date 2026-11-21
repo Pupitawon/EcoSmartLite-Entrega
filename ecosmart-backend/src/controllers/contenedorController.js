@@ -1,3 +1,5 @@
+const { z } = require('zod');
+const pool = require('../config/db');
 const { listarContenedores } = require('../services/lecturaService');
 const { aplicarLectura } = require('./lecturaController');
 
@@ -47,4 +49,38 @@ const getEstadoConexion = async (req, res) => {
   }
 };
 
-module.exports = { getContenedores, updateNivelLlenado, getEstadoConexion };
+// Nueva posición de un contenedor (el admin lo trasladó o corrige su ubicación). (0, 0) se rechaza: es "sin ubicación".
+const ubicacionSchema = z
+  .object({
+    latitud: z.number().min(-90).max(90),
+    longitud: z.number().min(-180).max(180),
+  })
+  .strict()
+  .refine((u) => !(u.latitud === 0 && u.longitud === 0), { message: 'Ubicación (0, 0) no válida', path: ['latitud'] });
+
+const cambiarUbicacion = async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(422).json({ error: 'id_invalido' });
+  const parsed = ubicacionSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(422).json({
+      error: 'datos_invalidos',
+      detalles: parsed.error.issues.map((i) => ({ campo: i.path.join('.'), mensaje: i.message })),
+    });
+  }
+  try {
+    const r = await pool.query('UPDATE contenedor SET latitud = $2, longitud = $3 WHERE id_contenedor = $1', [
+      id,
+      parsed.data.latitud,
+      parsed.data.longitud,
+    ]);
+    if (!r.rowCount) return res.status(404).json({ error: 'contenedor_no_encontrado' });
+    const contenedor = (await listarContenedores()).find((c) => c.id_contenedor === id);
+    res.json({ contenedor });
+  } catch (err) {
+    console.error('Error al cambiar la ubicación:', err.message);
+    res.status(500).json({ error: 'error_interno' });
+  }
+};
+
+module.exports = { getContenedores, updateNivelLlenado, getEstadoConexion, cambiarUbicacion };

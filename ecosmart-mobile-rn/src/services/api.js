@@ -1,5 +1,6 @@
 import { API_URL } from '../config';
 import { auth } from '../firebase';
+import { direccionDesdeOSM, urlNominatim } from '../utils/ubicacion';
 
 const TIMEOUT_MS = 10000;
 
@@ -53,19 +54,43 @@ export async function llamarPublico(ruta, opciones = {}) {
   return { status: res.status, datos };
 }
 
-/** Nueva ubicación de un contenedor (solo administradores). Devuelve el contenedor actualizado. */
-export async function moverContenedor(id, latitud, longitud) {
+/**
+ * Nueva ubicación y dirección de un contenedor (solo administradores). Devuelve el contenedor actualizado.
+ * direccion: texto libre; '' la borra; undefined no la cambia.
+ */
+export async function moverContenedor(id, latitud, longitud, direccion) {
   const { status, datos } = await llamar(`/api/contenedores/${id}/ubicacion`, {
     method: 'PATCH',
-    body: JSON.stringify({ latitud, longitud }),
+    body: JSON.stringify({ latitud, longitud, ...(direccion !== undefined ? { direccion } : {}) }),
   });
   if (status === 200) return datos.contenedor;
   throw new Error(
     status === 403 ? 'Tu cuenta no es de administrador.'
       : status === 404 ? 'El contenedor ya no existe.'
-      : status === 422 ? 'La ubicación no es válida.'
+      : status === 422 ? (datos?.detalles?.[0]?.mensaje || 'La ubicación no es válida.')
       : `El servidor respondió ${status}.`
   );
+}
+
+/**
+ * Dirección sugerida para un punto, con el buscador gratuito de OpenStreetMap. Puede ser aproximada:
+ * el admin la revisa antes de guardar. Devuelve el texto o lanza un Error con el motivo.
+ */
+export async function sugerirDireccion(lat, lng) {
+  const ctrl = new AbortController();
+  const reloj = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const res = await fetch(urlNominatim(lat, lng), { signal: ctrl.signal, headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error(`OpenStreetMap respondió ${res.status}.`);
+    const texto = direccionDesdeOSM(await res.json());
+    if (!texto) throw new Error('OpenStreetMap no encontró una dirección para ese punto. Escríbela a mano.');
+    return texto;
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('OpenStreetMap tardó demasiado. Escribe la dirección a mano.');
+    throw e;
+  } finally {
+    clearTimeout(reloj);
+  }
 }
 
 /** Cambia el estado de revisión de un reporte ciudadano. Solo administradores. */

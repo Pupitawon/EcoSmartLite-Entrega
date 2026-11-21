@@ -6,6 +6,7 @@ import useUbicacion from '../hooks/useUbicacion';
 import { aPin } from '../utils/pines';
 import { distanciaMetros, textoDistancia } from '../utils/distancia';
 import { leerCoordenadas, urlGoogleMaps } from '../utils/ubicacion';
+import { sugerirDireccion } from '../services/api';
 import { CALAMA, temaDe } from '../tema';
 import { useAdminData } from './AdminData';
 import { Boton, Etiqueta, Filtros, Progreso } from './ui';
@@ -104,6 +105,9 @@ function Detalle({ c }) {
 
       {/* Dónde está: el mismo mapa que ve el ciudadano, enfocado en este contenedor */}
       <Text style={[e.rotulo, { color: t.textoSuave, marginTop: 20 }]}>Ubicación</Text>
+      <Text style={{ fontSize: 13, fontWeight: '600', color: c.direccion ? t.texto : t.textoSuave, marginBottom: 8 }}>
+        {c.direccion || 'Sin dirección registrada'}
+      </Text>
       {tieneUbicacion(c) ? (
         <View style={[e.mapaMini, { borderColor: t.borde }]}>
           <MapaView pins={[aPin(c)]} darkMode={darkMode} seleccionado={aPin(c)} posicion={null} centrar={0} centro={{ lat: c.latitud, lng: c.longitud }} />
@@ -115,7 +119,7 @@ function Detalle({ c }) {
         {tieneUbicacion(c) ? (
           <Boton icono={ExternalLink} onPress={() => Linking.openURL(urlGoogleMaps(c.latitud, c.longitud))}>Abrir en Google Maps</Boton>
         ) : null}
-        <Boton icono={Move} onPress={() => abrirMover(c.id_contenedor)}>Cambiar ubicación</Boton>
+        <Boton icono={Move} onPress={() => abrirMover(c.id_contenedor)}>Editar ubicación y dirección</Boton>
       </View>
 
       <Lista titulo="Historial de alertas" vacio="Sin alertas registradas" t={t}>
@@ -178,8 +182,23 @@ function MoverContenedor({ c }) {
   const [centro, setCentro] = useState(inicial); // dónde mira el mapa: no se mueve al tocar ni con cada tecla
   const [txt, setTxt] = useState({ lat: String(inicial.lat), lng: String(inicial.lng) });
   const [pedido, setPedido] = useState(0); // > 0 mientras se pide la ubicación; cada pedido es una búsqueda nueva
+  const [direccion, setDireccion] = useState(c.direccion || '');
+  const [sugiriendo, setSugiriendo] = useState(false);
   const [error, setError] = useState('');
   const [guardando, setGuardando] = useState(false);
+
+  // Completa la dirección desde el punto del mapa (OpenStreetMap). El admin la revisa antes de guardar.
+  const sugerir = async () => {
+    setError('');
+    setSugiriendo(true);
+    try {
+      setDireccion(await sugerirDireccion(punto.lat, punto.lng));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSugiriendo(false);
+    }
+  };
 
   // Tocar el mapa: mueve el pin sin recentrar ni cambiar el zoom que eligió el admin.
   const fijar = (lat, lng) => {
@@ -210,8 +229,9 @@ function MoverContenedor({ c }) {
   const guardar = async () => {
     const r = leerCoordenadas(txt.lat, txt.lng);
     if (r.error) return setError(r.error);
+    if (direccion.trim().length > 200) return setError('La dirección puede tener hasta 200 caracteres.');
     setGuardando(true);
-    const ok = await moverContenedor(c.id_contenedor, r.latitud, r.longitud);
+    const ok = await moverContenedor(c.id_contenedor, r.latitud, r.longitud, direccion.trim());
     setGuardando(false);
     if (ok) abrirDetalle(c.id_contenedor);
   };
@@ -225,10 +245,11 @@ function MoverContenedor({ c }) {
         <Pressable onPress={() => abrirDetalle(c.id_contenedor)} accessibilityLabel="Volver al detalle" hitSlop={10}>
           <ArrowLeft size={20} color={t.texto} />
         </Pressable>
-        <Text style={{ fontSize: 18, fontWeight: '900', color: t.texto }}>Mover contenedor #{c.id_contenedor}</Text>
+        <Text style={{ fontSize: 18, fontWeight: '900', color: t.texto }}>Contenedor #{c.id_contenedor}: ubicación</Text>
       </View>
       <Text style={{ fontSize: 12, color: t.textoSuave, marginBottom: 10 }}>
         Toca el mapa en el lugar nuevo, usa tu ubicación si estás junto al contenedor, o escribe las coordenadas.
+        Si solo cambias la dirección, deja el punto como está.
       </Text>
 
       <View style={[e.mapaMover, { borderColor: t.borde }]}>
@@ -266,6 +287,23 @@ function MoverContenedor({ c }) {
         ))}
       </View>
 
+      <Text style={[e.rotulo, { color: t.textoSuave, marginTop: 14 }]}>Dirección o referencia</Text>
+      <TextInput
+        value={direccion}
+        onChangeText={setDireccion}
+        placeholder="Ej. Av. Granaderos 2390, frente al supermercado"
+        placeholderTextColor="#78716c"
+        maxLength={200}
+        accessibilityLabel="Dirección o referencia"
+        style={[e.campoCoord, { color: t.texto, borderColor: t.campoBorde, backgroundColor: t.campo }]}
+      />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 }}>
+        {sugiriendo ? <ActivityIndicator color={COLOR.verde} /> : (
+          <Boton icono={MapPin} onPress={sugerir}>Sugerir dirección</Boton>
+        )}
+        <Text style={{ flex: 1, fontSize: 11, color: t.textoSuave }}>Desde el punto del mapa (OpenStreetMap). Revísala antes de guardar.</Text>
+      </View>
+
       {movido != null && movido >= 1 ? (
         <Text style={{ fontSize: 12, color: movido > 5000 ? COLOR.ambar : t.textoSuave, marginTop: 8 }}>
           {`Se moverá ${textoDistancia(movido)} desde su ubicación actual${movido > 5000 ? '. Revisa que sea el lugar correcto.' : '.'}`}
@@ -275,7 +313,7 @@ function MoverContenedor({ c }) {
 
       <View style={{ marginTop: 16 }}>
         {guardando ? <ActivityIndicator color={COLOR.verde} /> : (
-          <Boton grande variante="primario" icono={MapPin} onPress={guardar}>Guardar ubicación nueva</Boton>
+          <Boton grande variante="primario" icono={MapPin} onPress={guardar}>Guardar</Boton>
         )}
       </View>
     </ScrollView>

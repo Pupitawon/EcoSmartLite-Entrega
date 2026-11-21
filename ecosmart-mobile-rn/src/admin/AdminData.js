@@ -108,13 +108,13 @@ export function AdminDataProvider({ children, darkMode, onIrA }) {
     [ordenesApi, porId]
   );
 
-  // Nueva ubicación de un contenedor: se actualiza al instante en el mapa y la lista. Devuelve true si se guardó.
+  // Nueva ubicación y dirección de un contenedor: se actualiza al instante en el mapa y la lista. Devuelve true si se guardó.
   const moverContenedor = useCallback(
-    async (id, latitud, longitud) => {
+    async (id, latitud, longitud, direccion) => {
       try {
-        const c = await apiMoverContenedor(id, latitud, longitud);
+        const c = await apiMoverContenedor(id, latitud, longitud, direccion);
         setContenedores((prev) => prev.map((x) => (x.id_contenedor === id ? { ...x, ...c } : x)));
-        avisar(`Contenedor #${id}: ubicación actualizada`);
+        avisar(`Contenedor #${id}: ubicación y dirección actualizadas`);
         return true;
       } catch (e) {
         avisar(`No se pudo mover el contenedor: ${e.message}`);

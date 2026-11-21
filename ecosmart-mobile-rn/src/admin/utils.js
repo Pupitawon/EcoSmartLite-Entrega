@@ -49,8 +49,9 @@ export const COLOR_PRIORIDAD = { Alta: COLOR.rojo, Media: COLOR.ambar, Baja: COL
 export const TECNICOS = ['R. Fuentes', 'M. Soto', 'J. Pinto', 'Sin asignar'];
 
 export const material = (c) => c?.nombre_material || 'Sin material';
+/** Dónde está: la dirección si la tiene; si no, las coordenadas. */
 export const ubicacion = (c) =>
-  c?.latitud != null && c?.longitud != null ? `${c.latitud.toFixed(4)}, ${c.longitud.toFixed(4)}` : '—';
+  c?.direccion || (c?.latitud != null && c?.longitud != null ? `${c.latitud.toFixed(4)}, ${c.longitud.toFixed(4)}` : '—');
 
 /** "hace 5 min", "hace 2 h"... */
 export function hace(iso, ahora = Date.now()) {

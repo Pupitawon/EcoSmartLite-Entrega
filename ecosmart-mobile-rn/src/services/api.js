@@ -53,7 +53,22 @@ export async function llamarPublico(ruta, opciones = {}) {
   return { status: res.status, datos };
 }
 
-/** Cambia el estado de revisión de un reporte ciudadano. Solo administradores (ADMIN_UIDS en el backend). */
+/** Nueva ubicación de un contenedor (solo administradores). Devuelve el contenedor actualizado. */
+export async function moverContenedor(id, latitud, longitud) {
+  const { status, datos } = await llamar(`/api/contenedores/${id}/ubicacion`, {
+    method: 'PATCH',
+    body: JSON.stringify({ latitud, longitud }),
+  });
+  if (status === 200) return datos.contenedor;
+  throw new Error(
+    status === 403 ? 'Tu cuenta no es de administrador.'
+      : status === 404 ? 'El contenedor ya no existe.'
+      : status === 422 ? 'La ubicación no es válida.'
+      : `El servidor respondió ${status}.`
+  );
+}
+
+/** Cambia el estado de revisión de un reporte ciudadano. Solo administradores. */
 export async function actualizarReporte(id, estado_revision) {
   const { status, datos } = await llamar(`/api/reportes/${id}`, {
     method: 'PATCH',

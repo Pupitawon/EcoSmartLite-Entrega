@@ -20,9 +20,11 @@ before(async () => {
   await new Promise((r) => { server = app.listen(0, r); });
   base = `http://localhost:${server.address().port}`;
   await pool.query("DELETE FROM usuario WHERE id_auth LIKE 'uid-test-%'");
+  await pool.query("DELETE FROM administrador WHERE id_auth LIKE 'uid-test-%'");
 });
 after(async () => {
   await pool.query("DELETE FROM usuario WHERE id_auth LIKE 'uid-test-%'");
+  await pool.query("DELETE FROM administrador WHERE id_auth LIKE 'uid-test-%'");
   server.close(); jwksServer.close(); await pool.end();
 });
 
@@ -127,4 +129,50 @@ test('PATCH /me cambia recibe_notificaciones; solo ese campo; sin perfil → 404
   assert.equal((await patch('uid-test-1', { recibe_notificaciones: 'no' })).status, 422);
   assert.equal((await patch('uid-test-1', { recibe_notificaciones: false, saldo_ecopoints: 999 })).status, 422);
   assert.equal((await patch('uid-test-nuevo', { recibe_notificaciones: false })).status, 404);
+});
+
+const sembrarAdmin = (uid, { activo = true, debe = false, nombre = 'Ana Admin' } = {}) =>
+  pool.query(
+    `INSERT INTO administrador (id_auth, correo, nombre_completo, telefono, rut, activo, debe_cambiar_clave, creado_por)
+     VALUES ($1, $2, $3, '+56912345678', '11111111-1', $4, $5, 'uid-super')`,
+    [uid, `${uid}@mail.cl`, nombre, activo, debe]
+  );
+const me = async (sub) => fetch(`${base}/api/usuarios/me`, { headers: { Authorization: `Bearer ${await token({ sub })}` } });
+const claveCambiada = async (sub) =>
+  fetch(`${base}/api/usuarios/me/clave-cambiada`, { method: 'POST', headers: { Authorization: `Bearer ${await token({ sub })}` } });
+
+test('GET /me de un admin de la tabla sin perfil de ciudadano trae sus datos y su rol', async () => {
+  await sembrarAdmin('uid-test-tabla');
+  const r = await me('uid-test-tabla');
+  assert.equal(r.status, 200);
+  const { usuario } = await r.json();
+  assert.equal(usuario.nombre_completo, 'Ana Admin');
+  assert.equal(usuario.telefono, '+56912345678');
+  assert.equal(usuario.rut, '11111111-1');
+  assert.equal(usuario.es_admin, true);
+  assert.equal(usuario.es_super, false);
+  assert.equal(usuario.debe_cambiar_clave, false);
+});
+
+test('contraseña temporal: /me la marca y clave-cambiada la libera para usar el panel', async () => {
+  await sembrarAdmin('uid-test-temp', { debe: true });
+  assert.equal((await (await me('uid-test-temp')).json()).usuario.debe_cambiar_clave, true);
+  const ordenes = async () => fetch(`${base}/api/ordenes`, { headers: { Authorization: `Bearer ${await token({ sub: 'uid-test-temp' })}` } });
+  assert.equal((await ordenes()).status, 403);
+  const ok = await claveCambiada('uid-test-temp');
+  assert.equal(ok.status, 200);
+  assert.equal((await (await me('uid-test-temp')).json()).usuario.debe_cambiar_clave, false);
+  assert.equal((await ordenes()).status, 200);
+  assert.equal((await claveCambiada('uid-test-nuevo')).status, 404);
+});
+
+test('admin desactivado sin perfil → 403 admin_desactivado; con perfil de ciudadano entra como ciudadano', async () => {
+  await sembrarAdmin('uid-test-off', { activo: false });
+  const r = await me('uid-test-off');
+  assert.equal(r.status, 403);
+  assert.equal((await r.json()).error, 'admin_desactivado');
+  await sembrarAdmin('uid-test-1', { activo: false });
+  const c = await me('uid-test-1');
+  assert.equal(c.status, 200);
+  assert.equal((await c.json()).usuario.es_admin, false);
 });

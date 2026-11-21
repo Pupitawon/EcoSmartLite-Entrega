@@ -62,17 +62,35 @@ const registrarUsuario = async (req, res) => {
   }
 };
 
-// Perfil del usuario autenticado (404 si se creó en Firebase pero aún no completó el registro).
+// Rol que la app necesita para decidir qué vista mostrar.
+const marcasRol = (rol) => ({ es_admin: rol.esAdmin, es_super: rol.esSuper, debe_cambiar_clave: rol.debeCambiarClave });
+
+/**
+ * Perfil del usuario autenticado.
+ * - Ciudadano: su fila de `usuario` + el rol (un admin desactivado con perfil de ciudadano entra como ciudadano).
+ * - Admin sin perfil de ciudadano: sus datos de `administrador` (o "Administrador" si viene de SUPER_UIDS / ADMIN_UIDS).
+ * - Admin desactivado sin perfil: 403 admin_desactivado.
+ * - Nadie: 404 (se creó en Firebase pero aún no completó el registro).
+ */
 const miPerfil = async (req, res) => {
   try {
-    const admin = (await rolDe(req.user.uid)).esAdmin;
+    const rol = await rolDe(req.user.uid);
     const r = await pool.query(`SELECT ${COLUMNAS} FROM usuario WHERE id_auth = $1`, [req.user.uid]);
-    if (!r.rows[0]) {
-      // Un administrador puede no tener perfil de ciudadano (RUT, EcoPoints): igual puede entrar.
-      if (admin) return res.json({ usuario: { nombre_completo: 'Administrador', correo: req.user.email, es_admin: true } });
-      return res.status(404).json({ error: 'perfil_no_encontrado' });
+    if (r.rows[0]) return res.json({ usuario: { ...r.rows[0], ...marcasRol(rol) } });
+    if (rol.esAdmin) {
+      const a = rol.admin;
+      return res.json({
+        usuario: {
+          nombre_completo: a?.nombre_completo || 'Administrador',
+          correo: a?.correo || req.user.email,
+          telefono: a?.telefono || null,
+          rut: a?.rut || null,
+          ...marcasRol(rol),
+        },
+      });
     }
-    res.json({ usuario: { ...r.rows[0], es_admin: admin } });
+    if (rol.desactivado) return res.status(403).json({ error: 'admin_desactivado' });
+    return res.status(404).json({ error: 'perfil_no_encontrado' });
   } catch (err) {
     console.error('Error al leer perfil:', err.message);
     res.status(500).json({ error: 'error_interno' });
@@ -96,9 +114,28 @@ const actualizarPreferencias = async (req, res) => {
       [req.user.uid, parsed.data.recibe_notificaciones]
     );
     if (!r.rows[0]) return res.status(404).json({ error: 'perfil_no_encontrado' });
-    res.json({ usuario: { ...r.rows[0], es_admin: (await rolDe(req.user.uid)).esAdmin } });
+    res.json({ usuario: { ...r.rows[0], ...marcasRol(await rolDe(req.user.uid)) } });
   } catch (err) {
     console.error('Error al actualizar preferencias:', err.message);
+    res.status(500).json({ error: 'error_interno' });
+  }
+};
+
+/**
+ * El admin avisa que ya cambió su contraseña temporal (la app lo llama después de cambiarla en Firebase).
+ * Sin Admin SDK el servidor no puede comprobar el cambio: confía en el aviso. Solo el súper usuario vio la temporal.
+ */
+const claveCambiada = async (req, res) => {
+  try {
+    const r = await pool.query(
+      `UPDATE administrador SET debe_cambiar_clave = FALSE, fecha_actualizacion = (NOW() AT TIME ZONE 'UTC')
+        WHERE id_auth = $1 RETURNING id_admin`,
+      [req.user.uid]
+    );
+    if (!r.rowCount) return res.status(404).json({ error: 'admin_no_encontrado' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error al marcar la contraseña cambiada:', err.message);
     res.status(500).json({ error: 'error_interno' });
   }
 };
@@ -178,4 +215,4 @@ const recuperarClave = async (req, res) => {
   }
 };
 
-module.exports = { registrarUsuario, miPerfil, actualizarPreferencias, misInsignias, misDesafios, miRanking, recuperarClave, rutValido, normalizarRut };
+module.exports = { registrarUsuario, miPerfil, actualizarPreferencias, claveCambiada, misInsignias, misDesafios, miRanking, recuperarClave, rutValido, normalizarRut };

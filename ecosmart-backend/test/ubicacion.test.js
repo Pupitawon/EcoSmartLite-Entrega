@@ -18,10 +18,10 @@ before(async () => {
   await new Promise((r) => jwksServer.listen(4999, r));
   await new Promise((r) => { server = app.listen(0, r); });
   base = `http://localhost:${server.address().port}`;
-  original = (await pool.query('SELECT latitud, longitud FROM contenedor WHERE id_contenedor = 101')).rows[0];
+  original = (await pool.query('SELECT latitud, longitud, direccion FROM contenedor WHERE id_contenedor = 101')).rows[0];
 });
 after(async () => {
-  await pool.query('UPDATE contenedor SET latitud = $1, longitud = $2 WHERE id_contenedor = 101', [original.latitud, original.longitud]);
+  await pool.query('UPDATE contenedor SET latitud = $1, longitud = $2, direccion = $3 WHERE id_contenedor = 101', [original.latitud, original.longitud, original.direccion]);
   server.close(); jwksServer.close(); await pool.end();
 });
 
@@ -71,4 +71,27 @@ test('coordenadas inválidas → 422; contenedor inexistente → 404; id malo �
   }
   assert.equal((await mover(999999, { latitud: -22.46, longitud: -68.93 })).status, 404);
   assert.equal((await mover('abc', { latitud: -22.46, longitud: -68.93 })).status, 422);
+});
+
+test('dirección: se guarda con la ubicación, se puede cambiar sola y se borra con texto vacío', async () => {
+  const r = await mover(101, { latitud: -22.4601, longitud: -68.9301, direccion: '  Av. Granaderos 2390, frente al Jumbo  ' });
+  assert.equal(r.status, 200);
+  assert.equal((await r.json()).contenedor.direccion, 'Av. Granaderos 2390, frente al Jumbo');
+  const lista = await (await fetch(`${base}/api/contenedores`)).json();
+  assert.equal(lista.find((x) => x.id_contenedor === 101).direccion, 'Av. Granaderos 2390, frente al Jumbo');
+
+  const solo = await mover(101, { direccion: 'Plaza 23 de Marzo' });
+  assert.equal(solo.status, 200);
+  const c = (await solo.json()).contenedor;
+  assert.equal(c.direccion, 'Plaza 23 de Marzo');
+  assert.equal(c.latitud, -22.4601); // no se movió
+
+  const vacia = await mover(101, { direccion: '   ' });
+  assert.equal((await vacia.json()).contenedor.direccion, null);
+});
+
+test('dirección: muy larga, sin campos o con coordenada a medias → 422', async () => {
+  assert.equal((await mover(101, { direccion: 'x'.repeat(201) })).status, 422);
+  assert.equal((await mover(101, {})).status, 422);
+  assert.equal((await mover(101, { latitud: -22.46, direccion: 'Calle 1' })).status, 422);
 });

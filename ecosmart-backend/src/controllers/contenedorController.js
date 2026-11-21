@@ -49,13 +49,26 @@ const getEstadoConexion = async (req, res) => {
   }
 };
 
-// Nueva posición de un contenedor (el admin lo trasladó o corrige su ubicación). (0, 0) se rechaza: es "sin ubicación".
+/**
+ * Nueva posición y/o dirección de un contenedor (el admin lo trasladó o corrige sus datos).
+ * - latitud y longitud van juntas; (0, 0) se rechaza: es "sin ubicación".
+ * - direccion: texto libre (calle, número, referencia); vacía = se borra.
+ * Debe venir al menos una de las dos cosas.
+ */
 const ubicacionSchema = z
   .object({
-    latitud: z.number().min(-90).max(90),
-    longitud: z.number().min(-180).max(180),
+    latitud: z.number().min(-90).max(90).optional(),
+    longitud: z.number().min(-180).max(180).optional(),
+    direccion: z
+      .string()
+      .trim()
+      .max(200, 'La dirección puede tener hasta 200 caracteres')
+      .transform((d) => d || null)
+      .optional(),
   })
   .strict()
+  .refine((u) => (u.latitud === undefined) === (u.longitud === undefined), { message: 'Envía latitud y longitud juntas', path: ['latitud'] })
+  .refine((u) => u.latitud !== undefined || u.direccion !== undefined, { message: 'Envía una ubicación o una dirección', path: ['direccion'] })
   .refine((u) => !(u.latitud === 0 && u.longitud === 0), { message: 'Ubicación (0, 0) no válida', path: ['latitud'] });
 
 const cambiarUbicacion = async (req, res) => {
@@ -69,11 +82,18 @@ const cambiarUbicacion = async (req, res) => {
     });
   }
   try {
-    const r = await pool.query('UPDATE contenedor SET latitud = $2, longitud = $3 WHERE id_contenedor = $1', [
-      id,
-      parsed.data.latitud,
-      parsed.data.longitud,
-    ]);
+    const { latitud, longitud, direccion } = parsed.data;
+    const cambios = [];
+    const valores = [id];
+    if (latitud !== undefined) {
+      valores.push(latitud, longitud);
+      cambios.push(`latitud = $${valores.length - 1}`, `longitud = $${valores.length}`);
+    }
+    if (direccion !== undefined) {
+      valores.push(direccion);
+      cambios.push(`direccion = $${valores.length}`);
+    }
+    const r = await pool.query(`UPDATE contenedor SET ${cambios.join(', ')} WHERE id_contenedor = $1`, valores);
     if (!r.rowCount) return res.status(404).json({ error: 'contenedor_no_encontrado' });
     const contenedor = (await listarContenedores()).find((c) => c.id_contenedor === id);
     res.json({ contenedor });

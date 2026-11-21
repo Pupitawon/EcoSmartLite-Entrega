@@ -19,6 +19,7 @@ cp .env.example .env        # completa DATABASE_URL e INGEST_API_KEY
    **Reportes ciudadanos (una vez):** ejecuta `sql/03_migracion_reportes.sql` (id autogenerado en `reporte_anomalia`, columnas `tipo_anomalia` y `fecha_revision`).
    **Seguridad (una vez):** `sql/04_seguridad_rls.sql` activa RLS (la API REST de Supabase no expone las tablas; el backend entra con el rol `postgres`).
    **Órdenes de trabajo (una vez):** `sql/05_ordenes_trabajo.sql` crea la tabla `orden_trabajo`.
+   **Dirección de contenedores (una vez):** `sql/08_direccion_contenedor.sql` agrega `contenedor.direccion` (aplicar antes de desplegar este backend).
    **Administradores (una vez):** `sql/07_administradores.sql` crea la tabla `administrador` (la gestiona el súper usuario desde la app).
    **Depósitos por QR (una vez):** `sql/06_depositos_qr.sql` crea `configuracion_sistema`, `contenedor.codigo_qr`, las columnas de `deposito_residuo` y la función `registrar_deposito` (depósito + saldo + insignias en una transacción).
 3. En `.env` define `FIREBASE_PROJECT_ID` (el Project ID de tu proyecto Firebase).
@@ -64,6 +65,8 @@ Content-Type: application/json
 | 404 | El contenedor no existe |
 | 422 | Validación: porcentaje fuera de 0–100, tipos incorrectos, campos extra, fecha futura |
 | 429 | Demasiadas solicitudes (`RATE_LIMIT_POR_MINUTO`, 600 por IP) |
+
+**Cambiar la ubicación de un contenedor** (solo administradores): `PATCH /api/contenedores/:id/ubicacion` con `{ "latitud": -22.46, "longitud": -68.93, "direccion": "Av. Granaderos 2390" }` (las coordenadas juntas, la dirección opcional; también se puede enviar solo `direccion`; vacía la borra) → 200 con el contenedor / 422 coordenadas inválidas o (0, 0) / 404 / 401 / 403.
 
 La ruta antigua `PUT /api/contenedores/:id/nivel` (body `{ "porcentaje_llenado": 82 }`) sigue funcionando y usa **la misma lógica**, pero ahora también exige credencial.
 

@@ -30,7 +30,7 @@ function estadoOperativo(p) {
 // Lectura de contenedores y alertas
 // ---------------------------------------------------------------------------
 const SELECT_CONTENEDOR = `
-  SELECT c.id_contenedor, c.id_material, m.nombre_material, c.latitud, c.longitud,
+  SELECT c.id_contenedor, c.id_material, m.nombre_material, c.latitud, c.longitud, c.direccion,
          c.porcentaje_llenado, c.fecha_ultima_lectura, c.estado_operativo,
          EXISTS (SELECT 1 FROM alerta_llenado a
                   WHERE a.id_contenedor = c.id_contenedor AND a.estado_alerta = 'pendiente') AS alerta_activa
@@ -57,6 +57,7 @@ function aDTO(row) {
     nombre_material: row.nombre_material,
     latitud: row.latitud === null ? null : Number(row.latitud),
     longitud: row.longitud === null ? null : Number(row.longitud),
+    direccion: row.direccion ?? null,
     porcentaje_llenado: Number(row.porcentaje_llenado),
     fecha_ultima_lectura: ult ? ult.toISOString() : null,
     estado_operativo: row.estado_operativo,

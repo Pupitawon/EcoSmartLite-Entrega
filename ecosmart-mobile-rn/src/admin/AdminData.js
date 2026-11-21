@@ -10,6 +10,7 @@ import {
   getContenedores,
   getOrdenes,
   getReportes,
+  moverContenedor as apiMoverContenedor,
 } from '../services/api';
 import { ESTADO_REPORTE, criterios, material, ubicacion } from './utils';
 import AdminHoja from './AdminHoja';
@@ -107,6 +108,22 @@ export function AdminDataProvider({ children, darkMode, onIrA }) {
     [ordenesApi, porId]
   );
 
+  // Nueva ubicación y dirección de un contenedor: se actualiza al instante en el mapa y la lista. Devuelve true si se guardó.
+  const moverContenedor = useCallback(
+    async (id, latitud, longitud, direccion) => {
+      try {
+        const c = await apiMoverContenedor(id, latitud, longitud, direccion);
+        setContenedores((prev) => prev.map((x) => (x.id_contenedor === id ? { ...x, ...c } : x)));
+        avisar(`Contenedor #${id}: ubicación y dirección actualizadas`);
+        return true;
+      } catch (e) {
+        avisar(`No se pudo mover el contenedor: ${e.message}`);
+        return false;
+      }
+    },
+    [avisar]
+  );
+
   const revisarReporte = useCallback(
     async (id, estado) => {
       try {
@@ -180,6 +197,7 @@ export function AdminDataProvider({ children, darkMode, onIrA }) {
     cr,
     porId,
     revisarReporte,
+    moverContenedor,
     ordenes,
     crearOrden,
     avanzarOrden,
@@ -187,6 +205,7 @@ export function AdminDataProvider({ children, darkMode, onIrA }) {
     hoja,
     abrirDetalle: (id) => setHoja({ tipo: 'detalle', id }),
     abrirNuevaOrden: (id, tipoReporte) => setHoja({ tipo: 'orden', id, tipoReporte }),
+    abrirMover: (id) => setHoja({ tipo: 'mover', id }),
     cerrarHoja: () => setHoja(null),
     darkMode,
   };

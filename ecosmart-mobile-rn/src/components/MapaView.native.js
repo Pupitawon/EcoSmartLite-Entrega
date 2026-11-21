@@ -7,9 +7,20 @@ const REGION = { ...CALAMA, latitudeDelta: 0.09, longitudeDelta: 0.09 };
 const ZOOM_USUARIO = 0.02; // acercamiento al centrar en la ubicación del usuario
 
 // Pines propios (círculo de color) para que el color sea exacto en iPhone y Android.
+const ZOOM_CENTRO = 0.008; // acercamiento al enfocar un contenedor
+
 // posicion: { lat, lng, precision } del usuario (o null). centrar: contador; cada cambio lleva el mapa al usuario.
-export default function MapaView({ pins, darkMode, seleccionado, onSelect, posicion, centrar }) {
+// centro (opcional): { lat, lng } en que se enfoca el mapa. onToqueMapa (opcional): (lat, lng) al tocar el mapa.
+export default function MapaView({ pins, darkMode, seleccionado, onSelect, posicion, centrar, centro, onToqueMapa }) {
   const mapa = useRef(null);
+
+  useEffect(() => {
+    if (!centro) return;
+    mapa.current?.animateToRegion(
+      { latitude: centro.lat, longitude: centro.lng, latitudeDelta: ZOOM_CENTRO, longitudeDelta: ZOOM_CENTRO },
+      400
+    );
+  }, [centro?.lat, centro?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!centrar || !posicion) return;
@@ -23,7 +34,8 @@ export default function MapaView({ pins, darkMode, seleccionado, onSelect, posic
     <MapView
       ref={mapa}
       style={StyleSheet.absoluteFill}
-      initialRegion={REGION}
+      initialRegion={centro ? { latitude: centro.lat, longitude: centro.lng, latitudeDelta: ZOOM_CENTRO, longitudeDelta: ZOOM_CENTRO } : REGION}
+      onPress={onToqueMapa ? (e) => onToqueMapa(e.nativeEvent.coordinate.latitude, e.nativeEvent.coordinate.longitude) : undefined}
       userInterfaceStyle={darkMode ? 'dark' : 'light'}
       toolbarEnabled={false}
       showsUserLocation={Boolean(posicion)}
@@ -36,7 +48,7 @@ export default function MapaView({ pins, darkMode, seleccionado, onSelect, posic
           <Marker
             key={`${pin.id_contenedor}-${color}-${activo}`}
             coordinate={{ latitude: pin.lat, longitude: pin.lng }}
-            onPress={() => onSelect(pin)}
+            onPress={() => onSelect?.(pin)}
             tracksViewChanges={false}
             anchor={{ x: 0.5, y: 0.5 }}
           >

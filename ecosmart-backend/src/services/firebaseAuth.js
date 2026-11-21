@@ -34,11 +34,24 @@ async function llamar(metodo, cuerpo, extraHeaders = {}) {
   return datos;
 }
 
-/** Crea una cuenta de correo y contraseña. Devuelve el UID. Lanza .codigo = 'EMAIL_EXISTS' | 'FIREBASE'. */
+/**
+ * Crea una cuenta de correo y contraseña. Devuelve el UID y el token de esa cuenta recién creada
+ * (sirve para borrarla si después falla guardar el administrador). Lanza .codigo = 'EMAIL_EXISTS' | 'FIREBASE'.
+ */
 async function crearCuenta(correo, clave) {
   const datos = await llamar('signUp', { email: correo, password: clave, returnSecureToken: true });
   if (!datos.localId) throw errorFirebase('FIREBASE', 'Firebase no devolvió el UID');
-  return { uid: datos.localId };
+  return { uid: datos.localId, idToken: datos.idToken };
+}
+
+/** Borra la cuenta recién creada con su propio token. Se usa para no dejar cuentas huérfanas; nunca lanza. */
+async function borrarCuenta(idToken) {
+  if (!idToken) return;
+  try {
+    await llamar('delete', { idToken });
+  } catch (err) {
+    console.error('No se pudo borrar la cuenta de Firebase recién creada:', err.message);
+  }
 }
 
 /** Envía el correo de Firebase para (re)definir la contraseña. Lanza .codigo = 'FIREBASE'. */
@@ -67,4 +80,4 @@ function generarClave() {
   return c.join('');
 }
 
-module.exports = { crearCuenta, enviarCorreoClave, generarClave };
+module.exports = { crearCuenta, borrarCuenta, enviarCorreoClave, generarClave };

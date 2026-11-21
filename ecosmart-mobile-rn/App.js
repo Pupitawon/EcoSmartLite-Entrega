@@ -25,6 +25,9 @@ import { AlertTriangle, ChartColumn, ClipboardList, MapPin, MessageSquareWarning
 import { AdminDataProvider } from './src/admin/AdminData';
 import MapaAdminScreen from './src/screens/admin/MapaAdminScreen';
 import PerfilAdminScreen from './src/screens/admin/PerfilAdminScreen';
+import AdministradoresScreen from './src/screens/admin/AdministradoresScreen';
+import CambiarClaveObligatoriaScreen from './src/screens/admin/CambiarClaveObligatoriaScreen';
+import AdminDesactivadoScreen from './src/screens/admin/AdminDesactivadoScreen';
 import AlertasScreen from './src/screens/admin/AlertasScreen';
 import ReportesScreen from './src/screens/admin/ReportesScreen';
 import OrdenesScreen from './src/screens/admin/OrdenesScreen';
@@ -81,7 +84,7 @@ export default function App() {
   // Racha de la barra superior: se pide al entrar y cada vez que cambia el saldo (un depósito nuevo puede extenderla).
   // El administrador no recicla: no se pide.
   useEffect(() => {
-    if (!perfil || perfil.es_admin) { setRacha(0); return; }
+    if (!perfil || perfil.es_admin || perfil.desactivado) { setRacha(0); return; }
     obtenerInsignias().then((d) => setRacha(d.racha?.actual ?? 0)).catch(() => {});
   }, [perfil?.id_usuario, perfil?.saldo_ecopoints, perfil?.es_admin]);
 
@@ -103,11 +106,23 @@ export default function App() {
       : pantalla === 'recuperar'
         ? <RecuperarClaveScreen darkMode={darkMode} onBack={() => setPantalla('login')} />
         : <LoginScreen darkMode={darkMode} onLogin={entrar} onGoToRegister={() => setPantalla('registro')} onGoToRecuperar={() => setPantalla('recuperar')} />;
+  } else if (perfil.desactivado) {
+    // El súper usuario le quitó el acceso de administrador (y no tiene perfil de ciudadano).
+    contenido = <AdminDesactivadoScreen darkMode={darkMode} onSalir={salir} />;
+  } else if (perfil.es_admin && perfil.debe_cambiar_clave) {
+    // Entró con contraseña temporal: antes del panel crea la suya (el servidor también lo bloquea hasta entonces).
+    contenido = (
+      <CambiarClaveObligatoriaScreen
+        darkMode={darkMode}
+        onListo={() => { setPerfil((p) => ({ ...p, debe_cambiar_clave: false })); setPantalla('mapa'); }}
+        onSalir={salir}
+      />
+    );
   } else if (perfil.es_admin) {
-    // Administrador: el backend lo reconoce por su UID (ADMIN_UIDS) y lo indica en /api/usuarios/me.
+    // Administrador: el backend lo reconoce (SUPER_UIDS, ADMIN_UIDS o tabla administrador) y lo indica en /api/usuarios/me.
     const Pantalla = ADMIN_PANTALLAS[pantalla] || MapaAdminScreen;
     contenido = (
-      // El proveedor sigue montado en Mi perfil y Configuración para no perder ni recargar los datos del panel.
+      // El proveedor sigue montado en Mi perfil, Configuración y Administradores para no recargar los datos del panel.
       <AdminDataProvider darkMode={darkMode} onIrA={setPantalla}>
         {pantalla === 'perfil' ? (
           <PerfilAdminScreen
@@ -115,8 +130,11 @@ export default function App() {
             darkMode={darkMode}
             onVolver={() => setPantalla(adminPrevia)}
             onConfiguracion={() => setPantalla('configuracion')}
+            onAdministradores={perfil.es_super ? () => setPantalla('administradores') : undefined}
             onIrA={setPantalla}
           />
+        ) : pantalla === 'administradores' && perfil.es_super ? (
+          <AdministradoresScreen darkMode={darkMode} onVolver={() => setPantalla('perfil')} />
         ) : pantalla === 'configuracion' ? (
           <ConfiguracionScreen
             perfil={perfil}

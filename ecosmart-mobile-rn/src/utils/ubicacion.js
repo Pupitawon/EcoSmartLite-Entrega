@@ -25,6 +25,34 @@ export function leerCoordenadas(latTexto, lngTexto) {
 /** Enlace que abre el punto en Google Maps (app o navegador). */
 export const urlGoogleMaps = (lat, lng) => `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
 
+/** Ruta en Google Maps desde donde está la persona hasta el contenedor, a pie (se puede cambiar en Google Maps). */
+export const urlComoLlegar = (lat, lng) =>
+  `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=walking`;
+
+// Calama: los resultados de esta zona salen primero, sin descartar el resto de Chile.
+const VIEWBOX_CALAMA = '-69.00,-22.40,-68.85,-22.52';
+
+/** Búsqueda de OpenStreetMap (Nominatim): de dirección a puntos, solo en Chile y priorizando Calama. */
+export const urlBuscarDireccion = (texto) =>
+  `https://nominatim.openstreetmap.org/search?${new URLSearchParams({
+    q: String(texto ?? '').trim(),
+    format: 'jsonv2',
+    addressdetails: '1',
+    countrycodes: 'cl',
+    viewbox: VIEWBOX_CALAMA,
+    bounded: '0',
+    limit: '5',
+    'accept-language': 'es',
+  })}`;
+
+/** Resultados de la búsqueda -> [{ lat, lng, texto }] con la dirección corta; descarta los que no traen punto válido. */
+export function resultadosDesdeOSM(lista) {
+  if (!Array.isArray(lista)) return [];
+  return lista
+    .map((r) => ({ lat: Number(r.lat), lng: Number(r.lon), texto: direccionDesdeOSM(r) }))
+    .filter((r) => Number.isFinite(r.lat) && Number.isFinite(r.lng) && r.texto);
+}
+
 /** Búsqueda inversa de OpenStreetMap (Nominatim): de coordenadas a dirección, en español. */
 export const urlNominatim = (lat, lng) =>
   `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=es`;

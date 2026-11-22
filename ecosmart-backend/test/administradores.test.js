@@ -63,7 +63,7 @@ const pedir = async (ruta, { method = 'GET', body, sub = 'uid-adm-super' } = {})
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 
-const datos = (correo, modo = 'enlace') => ({ nombre_completo: 'Ana Pérez', correo, telefono: '9 1234 5678', modo });
+const datos = (correo, modo = 'enlace') => ({ nombre_completo: 'Ana Pérez', correo, telefono: '9 1234 5678', rut: '11111111-1', modo });
 
 test('sin token → 401; admin normal o ciudadano → 403 solo_super_usuario', async () => {
   assert.equal((await pedir('', { sub: null })).status, 401);

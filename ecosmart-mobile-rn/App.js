@@ -217,7 +217,7 @@ export default function App() {
     <SafeAreaProvider>
       <StatusBar style={darkMode ? 'light' : 'dark'} />
       <SafeAreaView style={[e.fondo, { backgroundColor: darkMode ? '#18181b' : '#f5f5f4' }]}>
-        {/* En el navegador se muestra con forma de celular, igual que la app de Jeremy. */}
+        {/* En el navegador se muestra con forma de celular*/}
         <View style={[e.marco, { backgroundColor: t.fondoApp }]}>{contenido}</View>
       </SafeAreaView>
     </SafeAreaProvider>

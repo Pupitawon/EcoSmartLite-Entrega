@@ -43,3 +43,19 @@ export function direccionDesdeOSM(r) {
   const partes = String(r.display_name || '').split(',').map((x) => x.trim()).filter(Boolean);
   return partes.length ? partes.slice(0, 2).join(', ') : null;
 }
+
+
+// Búsqueda directa de OpenStreetMap: de una dirección escrita a un punto. Se limita a Chile y se favorece Calama.
+export const urlBuscarNominatim = (texto) => {
+  const q = /calama/i.test(texto) ? texto : `${texto}, Calama`;
+  return `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&countrycodes=cl&viewbox=-69.05,-22.38,-68.80,-22.55&limit=1&accept-language=es`;
+};
+
+// Primer resultado de la búsqueda como { lat, lng }, o null si no hubo.
+export function puntoDesdeOSM(lista) {
+  const r = Array.isArray(lista) ? lista[0] : null;
+  const lat = Number(r?.lat);
+  const lng = Number(r?.lon);
+  if (!r || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat: Number(lat.toFixed(7)), lng: Number(lng.toFixed(7)) };
+}

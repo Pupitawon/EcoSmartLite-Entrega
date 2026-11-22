@@ -1,12 +1,12 @@
 import { Children, useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { ArrowLeft, ClipboardPlus, ExternalLink, LocateFixed, MapPin, Move, X } from 'lucide-react-native';
+import { ArrowLeft, ClipboardPlus, ExternalLink, LocateFixed, MapPin, Move, Search, X } from 'lucide-react-native';
 import MapaView from '../components/MapaView';
 import useUbicacion from '../hooks/useUbicacion';
 import { aPin } from '../utils/pines';
 import { distanciaMetros, textoDistancia } from '../utils/distancia';
 import { leerCoordenadas, urlGoogleMaps } from '../utils/ubicacion';
-import { sugerirDireccion } from '../services/api';
+import { buscarDirecciones, sugerirDireccion } from '../services/api';
 import { CALAMA, temaDe } from '../tema';
 import { useAdminData } from './AdminData';
 import { Boton, Etiqueta, Filtros, Progreso } from './ui';
@@ -184,8 +184,31 @@ function MoverContenedor({ c }) {
   const [pedido, setPedido] = useState(0); // > 0 mientras se pide la ubicación; cada pedido es una búsqueda nueva
   const [direccion, setDireccion] = useState(c.direccion || '');
   const [sugiriendo, setSugiriendo] = useState(false);
+  const [busqueda, setBusqueda] = useState('');
+  const [buscando, setBuscando] = useState(false);
+  const [resultados, setResultados] = useState(null); // null = sin buscar; [] = sin resultados
   const [error, setError] = useState('');
   const [guardando, setGuardando] = useState(false);
+
+  // Buscar por dirección: el admin elige uno de los resultados y después puede ajustar el punto tocando el mapa.
+  const buscar = async () => {
+    if (busqueda.trim().length < 3) return setError('Escribe al menos la calle para buscar.');
+    setError('');
+    setBuscando(true);
+    try {
+      setResultados(await buscarDirecciones(busqueda));
+    } catch (err) {
+      setError(err.message);
+      setResultados(null);
+    } finally {
+      setBuscando(false);
+    }
+  };
+  const elegirResultado = (r) => {
+    setCentro(fijar(r.lat, r.lng));
+    setDireccion(r.texto);
+    setResultados(null);
+  };
 
   // Completa la dirección desde el punto del mapa (OpenStreetMap). El admin la revisa antes de guardar.
   const sugerir = async () => {
@@ -248,9 +271,45 @@ function MoverContenedor({ c }) {
         <Text style={{ fontSize: 18, fontWeight: '900', color: t.texto }}>Contenedor #{c.id_contenedor}: ubicación</Text>
       </View>
       <Text style={{ fontSize: 12, color: t.textoSuave, marginBottom: 10 }}>
-        Toca el mapa en el lugar nuevo, usa tu ubicación si estás junto al contenedor, o escribe las coordenadas.
-        Si solo cambias la dirección, deja el punto como está.
+        Busca la dirección, toca el mapa en el lugar nuevo, usa tu ubicación si estás junto al contenedor, o escribe las
+        coordenadas. Después de buscar puedes tocar el mapa para dejar el punto exacto.
       </Text>
+
+      {/* Buscar por dirección (OpenStreetMap, en Chile y priorizando Calama) */}
+      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+        <TextInput
+          value={busqueda}
+          onChangeText={(v) => { setBusqueda(v); setResultados(null); }}
+          onSubmitEditing={buscar}
+          returnKeyType="search"
+          placeholder="Buscar dirección, ej. Av. Granaderos 2390"
+          placeholderTextColor="#78716c"
+          accessibilityLabel="Buscar dirección"
+          style={[e.campoCoord, { flex: 1, color: t.texto, borderColor: t.campoBorde, backgroundColor: t.campo }]}
+        />
+        {buscando ? <ActivityIndicator color={COLOR.verde} /> : <Boton icono={Search} onPress={buscar}>Buscar</Boton>}
+      </View>
+      {resultados ? (
+        <View style={[e.resultados, { borderColor: t.borde, backgroundColor: t.superficie }]}>
+          {resultados.length === 0 ? (
+            <Text style={{ fontSize: 12, color: t.textoSuave, padding: 10 }}>
+              No encontramos esa dirección. Prueba solo con la calle, o toca el mapa.
+            </Text>
+          ) : (
+            resultados.map((r, i) => (
+              <Pressable
+                key={`${r.lat},${r.lng},${i}`}
+                onPress={() => elegirResultado(r)}
+                accessibilityRole="button"
+                style={[e.resultado, i > 0 && { borderTopWidth: 1, borderTopColor: t.borde }]}
+              >
+                <MapPin size={14} color={t.textoSuave} />
+                <Text style={{ flex: 1, fontSize: 13, color: t.texto }}>{r.texto}</Text>
+              </Pressable>
+            ))
+          )}
+        </View>
+      ) : null}
 
       <View style={[e.mapaMover, { borderColor: t.borde }]}>
         <MapaView pins={[pin]} darkMode={darkMode} seleccionado={pin} posicion={null} centrar={0} centro={centro} onToqueMapa={fijar} />
@@ -423,6 +482,8 @@ const e = StyleSheet.create({
   mapaMini: { height: 180, borderWidth: 1, borderRadius: 16, overflow: 'hidden', position: 'relative' },
   mapaMover: { height: 300, borderWidth: 1, borderRadius: 16, overflow: 'hidden', position: 'relative' },
   campoCoord: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14 },
+  resultados: { borderWidth: 1, borderRadius: 12, marginBottom: 8, overflow: 'hidden' },
+  resultado: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 9 },
   rotulo: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 },
   datos: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 16, rowGap: 12 },
   fila: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth },

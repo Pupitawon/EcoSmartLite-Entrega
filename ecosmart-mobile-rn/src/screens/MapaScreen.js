@@ -1,8 +1,8 @@
 //MapaScreen.js
 
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { LocateFixed, MapPin, Recycle, RefreshCw, X } from 'lucide-react-native';
+import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { LocateFixed, MapPin, Navigation, Recycle, RefreshCw, X } from 'lucide-react-native';
 import MapaView from '../components/MapaView';
 import LeyendaMapa from '../components/LeyendaMapa';
 import useContenedores from '../hooks/useContenedores';
@@ -10,6 +10,7 @@ import useUbicacion from '../hooks/useUbicacion';
 import { distanciaMetros, textoDistancia } from '../utils/distancia';
 import { STATUS_META, getPinStatus, horaLocal, temaDe } from '../tema';
 import { pinesDe } from '../utils/pines';
+import { urlComoLlegar } from '../utils/ubicacion';
 
 export default function MapaScreen({ darkMode, onViewStation }) {
   const t = temaDe(darkMode);
@@ -128,9 +129,21 @@ export default function MapaScreen({ darkMode, onViewStation }) {
               </View>
             )}
 
-            <Pressable onPress={() => onViewStation(seleccionado)} style={e.boton}>
-              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Ver estación en detalle</Text>
-            </Pressable>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {/* Ruta a pie en Google Maps desde donde está la persona hasta el contenedor */}
+              <Pressable
+                onPress={() => Linking.openURL(urlComoLlegar(seleccionado.lat, seleccionado.lng))}
+                accessibilityRole="link"
+                accessibilityLabel="Cómo llegar"
+                style={[e.boton, e.botonSecundario, { borderColor: '#10b981' }]}
+              >
+                <Navigation size={14} color="#10b981" />
+                <Text style={{ color: '#10b981', fontSize: 12, fontWeight: '700' }}>Cómo llegar</Text>
+              </Pressable>
+              <Pressable onPress={() => onViewStation(seleccionado)} style={[e.boton, { flex: 1 }]}>
+                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Ver en detalle</Text>
+              </Pressable>
+            </View>
           </View>
         )}
       </View>
@@ -152,4 +165,5 @@ const e = StyleSheet.create({
   materiales: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, paddingTop: 10, borderTopWidth: 1 },
   chip: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
   boton: { backgroundColor: '#059669', borderRadius: 12, paddingVertical: 10, alignItems: 'center', marginTop: 12 },
+  botonSecundario: { flex: 1, flexDirection: 'row', justifyContent: 'center', gap: 6, backgroundColor: 'transparent', borderWidth: 1 },
 });

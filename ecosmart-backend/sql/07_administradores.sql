@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS administrador (
   correo              VARCHAR(254) NOT NULL CHECK (correo = lower(correo)),
   nombre_completo     VARCHAR(100) NOT NULL,
   telefono            VARCHAR(20)  NOT NULL,          -- +569XXXXXXXX
-  rut                 VARCHAR(12),                    -- opcional, 12345678-K; no es único contra usuario
+  rut                 VARCHAR(12) NOT NULL,           -- 12345678-K
   activo              BOOLEAN NOT NULL DEFAULT TRUE,
   debe_cambiar_clave  BOOLEAN NOT NULL DEFAULT FALSE, -- true si se creó con contraseña temporal
   creado_por          VARCHAR(128) NOT NULL,          -- UID del súper usuario
@@ -23,3 +23,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_administrador_correo ON administrador (corr
 
 -- Igual que el resto de las tablas: solo el backend (rol del pool) accede; la API pública de Supabase no.
 ALTER TABLE administrador ENABLE ROW LEVEL SECURITY;
+
+-- el rut ahora es obligatorio
+UPDATE administrador SET rut = '0-0' WHERE rut IS NULL;
+ALTER TABLE administrador ALTER COLUMN rut SET NOT NULL;

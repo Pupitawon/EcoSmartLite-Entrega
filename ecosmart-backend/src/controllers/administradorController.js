@@ -84,7 +84,7 @@ const crear = async (req, res) => {
       const { rows } = await pool.query(
         `INSERT INTO administrador (id_auth, correo, nombre_completo, telefono, rut, debe_cambiar_clave, creado_por)
          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ${COLUMNAS_ADMIN}`,
-        [cuenta.uid, d.correo, d.nombre_completo, d.telefono, d.rut ?? null, temporal, req.user.uid]
+        [cuenta.uid, d.correo, d.nombre_completo, d.telefono, d.rut, temporal, req.user.uid]
       );
       fila = rows[0];
     } catch (err) {

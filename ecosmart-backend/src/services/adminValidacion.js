@@ -17,7 +17,7 @@ const adminSchema = z
       .string()
       .transform(normalizarTelefono)
       .refine((t) => t !== null, 'Teléfono inválido: usa un celular chileno, por ejemplo 9 1234 5678'),
-    rut: z.string().transform(normalizarRut).refine(rutValido, 'RUT inválido').optional(),
+    rut: z.string().transform(normalizarRut).refine(rutValido, 'RUT inválido'),
     modo: z.enum(['enlace', 'temporal']),
   })
   .strict();

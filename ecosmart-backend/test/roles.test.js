@@ -15,8 +15,8 @@ let server, base, jwksServer, privateKey;
 const limpiar = () => pool.query("DELETE FROM administrador WHERE id_auth LIKE 'uid-rol-%'");
 const sembrar = (uid, { activo = true, debe = false } = {}) =>
   pool.query(
-    `INSERT INTO administrador (id_auth, correo, nombre_completo, telefono, activo, debe_cambiar_clave, creado_por)
-     VALUES ($1, $2, 'Prueba Rol', '+56912345678', $3, $4, 'uid-rol-super')`,
+    `INSERT INTO administrador (id_auth, correo, nombre_completo, telefono, rut, activo, debe_cambiar_clave, creado_por)
+     VALUES ($1, $2, 'Prueba Rol', '+56912345678', '11111111-1', $3, $4, 'uid-rol-super')`,
     [uid, `${uid}@mail.cl`, activo, debe]
   );
 

@@ -22,13 +22,15 @@ test('normalizarTelefono acepta celulares chilenos y rechaza el resto', () => {
 });
 
 test('adminSchema normaliza correo, teléfono y RUT, y rechaza lo inválido', () => {
-  const base = { nombre_completo: 'Ana Pérez', correo: 'ANA@Mail.cl', telefono: '912345678', modo: 'enlace' };
+  const base = { nombre_completo: 'Ana Pérez', correo: 'ANA@Mail.cl', telefono: '912345678', rut: '11.111.111-1', modo: 'enlace' };
   const ok = adminSchema.safeParse(base);
   assert.equal(ok.success, true);
   assert.equal(ok.data.correo, 'ana@mail.cl');
   assert.equal(ok.data.telefono, '+56912345678');
-  assert.equal(adminSchema.safeParse({ ...base, rut: '11.111.111-1' }).data.rut, '11111111-1');
+  assert.equal(ok.data.rut, '11111111-1');
   assert.equal(adminSchema.safeParse({ ...base, rut: '11111111-2' }).success, false);
+  assert.equal(adminSchema.safeParse({ ...base, rut: undefined }).success, false);
+  assert.equal(adminSchema.safeParse({ ...base, rut: '' }).success, false);
   assert.equal(adminSchema.safeParse({ ...base, extra: 1 }).success, false);
   assert.equal(adminSchema.safeParse({ ...base, modo: 'otro' }).success, false);
 });

@@ -9,7 +9,7 @@ administrador quede registrado en Supabase con su rol y sus datos.
 ## Objetivos
 - Súper usuario definido por UID en `SUPER_UIDS` (variable de entorno, como hoy `ADMIN_UIDS`). Es también admin.
 - Tabla `administrador` en Supabase con los administradores y sus datos.
-- Desde la app, el súper usuario crea un admin con **nombre completo, correo, teléfono y RUT (opcional)**.
+- Desde la app, el súper usuario crea un admin con **nombre completo, correo, teléfono y RUT**.
 - Al crearlo, el backend crea una cuenta **nueva** de Firebase y:
   - **por defecto** Firebase le envía al nuevo admin el correo "crea tu contraseña" (mismo correo de restablecimiento que ya usa la app);
   - **como respaldo**, el súper usuario puede pedir una **contraseña temporal**: se le muestra una sola vez y el admin debe cambiarla en su primer inicio de sesión.
@@ -52,7 +52,7 @@ Tabla `administrador`:
 | `correo` | varchar, único (en minúsculas) | |
 | `nombre_completo` | varchar(100) | |
 | `telefono` | varchar(20) | se guarda como `+569XXXXXXXX` |
-| `rut` | varchar, null | opcional, validado con dígito verificador, formato `12345678-K`; no es único contra `usuario` |
+| `rut` | varchar, not null | obligatorio, validado con dígito verificador, formato `12345678-K`; no es único contra `usuario` |
 | `activo` | boolean, default true | |
 | `debe_cambiar_clave` | boolean, default false | true solo si se creó con contraseña temporal |
 | `creado_por` | varchar | UID del súper usuario |

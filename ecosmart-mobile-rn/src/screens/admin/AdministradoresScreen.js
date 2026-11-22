@@ -39,8 +39,8 @@ export default function AdministradoresScreen({ darkMode, onVolver }) {
   const crear = async () => {
     setMensaje(null);
     setClave(null);
-    if (!f.nombre_completo.trim() || !f.correo.trim() || !f.telefono.trim()) {
-      return setMensaje({ ok: false, texto: 'Completa nombre, correo y teléfono.' });
+    if (!f.nombre_completo.trim() || !f.correo.trim() || !f.telefono.trim() || !f.rut.trim()) {
+      return setMensaje({ ok: false, texto: 'Completa nombre, correo, teléfono y RUT.' });
     }
     setCreando(true);
     try {
@@ -101,7 +101,7 @@ export default function AdministradoresScreen({ darkMode, onVolver }) {
         <Campo darkMode={darkMode} Icono={User} etiqueta="Nombre completo" value={f.nombre_completo} onChangeText={set('nombre_completo')} placeholder="Ana Pérez" />
         <Campo darkMode={darkMode} Icono={Mail} etiqueta="Correo" value={f.correo} onChangeText={set('correo')} placeholder="ana@innovarecicla.cl" autoCapitalize="none" keyboardType="email-address" />
         <Campo darkMode={darkMode} Icono={Phone} etiqueta="Teléfono" value={f.telefono} onChangeText={set('telefono')} placeholder="9 1234 5678" keyboardType="phone-pad" />
-        <Campo darkMode={darkMode} Icono={IdCard} etiqueta="RUT (opcional)" value={f.rut} onChangeText={set('rut')} placeholder="12345678-5" autoCapitalize="characters" />
+        <Campo darkMode={darkMode} Icono={IdCard} etiqueta="RUT" value={f.rut} onChangeText={set('rut')} placeholder="12345678-5" autoCapitalize="characters" />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 }}>
           <KeyRound size={18} color={t.texto} />
           <View style={{ flex: 1 }}>
@@ -158,7 +158,7 @@ export default function AdministradoresScreen({ darkMode, onVolver }) {
               <Text style={{ color: t.texto, fontWeight: '700', fontSize: 15, flex: 1 }}>{a.nombre_completo}</Text>
               <Text style={{ color: est.color, fontWeight: '800', fontSize: 12 }}>{est.texto}</Text>
             </View>
-            <Text style={{ color: t.textoSuave, fontSize: 12 }}>{a.correo} · {telefonoVisible(a.telefono)}{a.rut ? ` · RUT ${a.rut}` : ''}</Text>
+            <Text style={{ color: t.textoSuave, fontSize: 12 }}>{a.correo} · {telefonoVisible(a.telefono)} · RUT {a.rut}</Text>
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
               {enCurso ? <ActivityIndicator color={t.acento} /> : (
                 <>

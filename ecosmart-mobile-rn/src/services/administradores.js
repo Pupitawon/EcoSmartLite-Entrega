@@ -26,14 +26,9 @@ export async function listarAdministradores() {
   throw error(status, datos, 'No se pudo cargar la lista de administradores.');
 }
 
-/**
- * Crea un administrador. datos = { nombre_completo, correo, telefono, rut?, modo: 'enlace' | 'temporal' }.
- * Devuelve { administrador, clave_temporal?, aviso? }. La clave temporal solo llega esta vez.
- */
+// Crea un administrador. La clave temporal solo llega esta vez.
 export async function crearAdministrador(datosAdmin) {
-  const cuerpo = { ...datosAdmin };
-  if (!cuerpo.rut) delete cuerpo.rut;
-  const { status, datos } = await llamar('/api/administradores', { method: 'POST', body: JSON.stringify(cuerpo) });
+  const { status, datos } = await llamar('/api/administradores', { method: 'POST', body: JSON.stringify(datosAdmin) });
   if (status === 201) return datos;
   throw error(status, datos, 'No se pudo crear el administrador.');
 }

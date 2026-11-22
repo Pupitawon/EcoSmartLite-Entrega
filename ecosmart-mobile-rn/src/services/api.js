@@ -1,6 +1,6 @@
 import { API_URL } from '../config';
 import { auth } from '../firebase';
-import { direccionDesdeOSM, urlNominatim } from '../utils/ubicacion';
+import { direccionDesdeOSM, puntoDesdeOSM, urlBuscarNominatim, urlNominatim } from '../utils/ubicacion';
 
 const TIMEOUT_MS = 10000;
 
@@ -87,6 +87,25 @@ export async function sugerirDireccion(lat, lng) {
     return texto;
   } catch (e) {
     if (e.name === 'AbortError') throw new Error('OpenStreetMap tardó demasiado. Escribe la dirección a mano.');
+    throw e;
+  } finally {
+    clearTimeout(reloj);
+  }
+}
+
+
+// Punto del mapa para una dirección escrita. Lanza un Error con el motivo si no la encuentra.
+export async function buscarPuntoDeDireccion(texto) {
+  const ctrl = new AbortController();
+  const reloj = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const res = await fetch(urlBuscarNominatim(texto), { signal: ctrl.signal, headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error(`OpenStreetMap respondió ${res.status}.`);
+    const punto = puntoDesdeOSM(await res.json());
+    if (!punto) throw new Error('No encontré esa dirección. Prueba con calle y número, o toca el mapa.');
+    return punto;
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('OpenStreetMap tardó demasiado. Toca el mapa en el lugar.');
     throw e;
   } finally {
     clearTimeout(reloj);

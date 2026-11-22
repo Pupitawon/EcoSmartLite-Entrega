@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { direccionDesdeOSM, leerCoordenadas, urlGoogleMaps } from '../src/utils/ubicacion.js';
+import { direccionDesdeOSM, leerCoordenadas, puntoDesdeOSM, urlBuscarNominatim, urlGoogleMaps } from '../src/utils/ubicacion.js';
 
 test('leerCoordenadas acepta punto o coma decimal y espacios', () => {
   assert.deepEqual(leerCoordenadas('-22.4612', '-68.9298'), { latitud: -22.4612, longitud: -68.9298 });
@@ -28,4 +28,17 @@ test('direccionDesdeOSM arma "calle número, sector" y omite lo que falta', () =
   assert.equal(direccionDesdeOSM({ display_name: 'Algo, Calama, Chile', address: {} }), 'Algo, Calama');
   assert.equal(direccionDesdeOSM({ error: 'Unable to geocode' }), null);
   assert.equal(direccionDesdeOSM(null), null);
+});
+
+
+test('puntoDesdeOSM toma el primer resultado y devuelve null si no hay', () => {
+  assert.deepEqual(puntoDesdeOSM([{ lat: '-22.45678901', lon: '-68.92345678' }]), { lat: -22.456789, lng: -68.9234568 });
+  assert.equal(puntoDesdeOSM([]), null);
+  assert.equal(puntoDesdeOSM(null), null);
+  assert.equal(puntoDesdeOSM([{ lat: 'x', lon: '1' }]), null);
+});
+
+test('urlBuscarNominatim agrega Calama si falta y codifica el texto', () => {
+  assert.match(urlBuscarNominatim('Av. Granaderos 2390'), /q=Av\.%20Granaderos%202390%2C%20Calama/);
+  assert.doesNotMatch(urlBuscarNominatim('Latorre 1500, Calama'), /Calama%2C%20Calama/);
 });

@@ -1,11 +1,11 @@
 import { Children, useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { ArrowLeft, ClipboardPlus, ExternalLink, LocateFixed, MapPin, Move, X } from 'lucide-react-native';
+import { ArrowLeft, ClipboardPlus, ExternalLink, LocateFixed, MapPin, Move, Search, X } from 'lucide-react-native';
 import MapaView from '../components/MapaView';
 import useUbicacion from '../hooks/useUbicacion';
 import { aPin } from '../utils/pines';
 import { distanciaMetros, textoDistancia } from '../utils/distancia';
-import { leerCoordenadas, urlGoogleMaps } from '../utils/ubicacion';
+import { buscarPuntoDeDireccion, sugerirDireccion } from '../services/api';
 import { sugerirDireccion } from '../services/api';
 import { CALAMA, temaDe } from '../tema';
 import { useAdminData } from './AdminData';
@@ -184,6 +184,7 @@ function MoverContenedor({ c }) {
   const [pedido, setPedido] = useState(0); // > 0 mientras se pide la ubicación; cada pedido es una búsqueda nueva
   const [direccion, setDireccion] = useState(c.direccion || '');
   const [sugiriendo, setSugiriendo] = useState(false);
+  const [buscando, setBuscando] = useState(false);
   const [error, setError] = useState('');
   const [guardando, setGuardando] = useState(false);
 
@@ -207,6 +208,22 @@ function MoverContenedor({ c }) {
     setTxt({ lat: String(p.lat), lng: String(p.lng) });
     setError('');
     return p;
+  };
+
+
+  // Lleva el pin a la dirección escrita. El admin ve dónde cayó y puede ajustarlo tocando el mapa.
+  const buscar = async () => {
+    if (direccion.trim().length < 4) return setError('Escribe la dirección para buscarla.');
+    setError('');
+    setBuscando(true);
+    try {
+      const p = await buscarPuntoDeDireccion(direccion.trim());
+      setCentro(fijar(p.lat, p.lng));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBuscando(false);
+    }
   };
 
   const usarUbicacion = (lat, lng) => {
@@ -248,8 +265,8 @@ function MoverContenedor({ c }) {
         <Text style={{ fontSize: 18, fontWeight: '900', color: t.texto }}>Contenedor #{c.id_contenedor}: ubicación</Text>
       </View>
       <Text style={{ fontSize: 12, color: t.textoSuave, marginBottom: 10 }}>
-        Toca el mapa en el lugar nuevo, usa tu ubicación si estás junto al contenedor, o escribe las coordenadas.
-        Si solo cambias la dirección, deja el punto como está.
+        Toca el mapa en el lugar nuevo, escribe la dirección y búscala, usa tu ubicación si estás junto al contenedor,
+        o escribe las coordenadas. Si solo cambias la dirección, deja el punto como está.
       </Text>
 
       <View style={[e.mapaMover, { borderColor: t.borde }]}>
@@ -298,11 +315,16 @@ function MoverContenedor({ c }) {
         style={[e.campoCoord, { color: t.texto, borderColor: t.campoBorde, backgroundColor: t.campo }]}
       />
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 }}>
+        {buscando ? <ActivityIndicator color={COLOR.verde} /> : (
+          <Boton icono={Search} onPress={buscar}>Buscar en el mapa</Boton>
+        )}
         {sugiriendo ? <ActivityIndicator color={COLOR.verde} /> : (
           <Boton icono={MapPin} onPress={sugerir}>Sugerir dirección</Boton>
         )}
-        <Text style={{ flex: 1, fontSize: 11, color: t.textoSuave }}>Desde el punto del mapa (OpenStreetMap). Revísala antes de guardar.</Text>
       </View>
+      <Text style={{ fontSize: 11, color: t.textoSuave, marginTop: 6 }}>
+        Con OpenStreetMap: busca el punto de la dirección, o sugiere la dirección del punto. Revisa antes de guardar.
+      </Text>
 
       {movido != null && movido >= 1 ? (
         <Text style={{ fontSize: 12, color: movido > 5000 ? COLOR.ambar : t.textoSuave, marginTop: 8 }}>

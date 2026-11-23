@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Flame, Lightbulb, X } from 'lucide-react-native';
 import { obtenerDesafios } from '../services/desafios';
-import { consejoDelDia } from '../utils/consejos';
+import { consejoDelDia, saludoDe } from '../utils/consejos';
 import { temaDe } from '../tema';
 
 /**
@@ -24,9 +24,10 @@ export default function AvisoReciclaje({ darkMode, racha = 0, saldo, notificacio
   if (!notificaciones || cerrado) return null;
 
   const recordar = reciclo === false;
+  const saludo = saludoDe();
   const recordatorio = racha > 0
-    ? `Llevas ${racha} ${racha === 1 ? 'día' : 'días'} de racha. Recicla hoy para no perderla.`
-    : 'Hoy no has reciclado. Haz un depósito y empieza tu racha.';
+    ? `${saludo}, no olvides reciclar para extender tu racha de ${racha} ${racha === 1 ? 'día' : 'días'}.`
+    : `${saludo}, recicla hoy para iniciar una nueva racha.`;
 
   return (
     <View style={[e.tarjeta, { backgroundColor: t.superficie, borderColor: recordar ? '#f97316' : t.borde }]}>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import { ChevronRight, MessageSquareWarning, Search, WifiOff } from 'lucide-react-native';
 import { temaDe } from '../tema';
-import { useAdminData } from './AdminData';
+import { useAdminData } from './AdminContext';
 import { EstadoCarga, Etiqueta, Filtros, Progreso, Tarjeta, Vacio } from './ui';
 import { COLOR, hace, material, ubicacion } from './utils';
 

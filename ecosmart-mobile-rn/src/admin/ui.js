@@ -2,7 +2,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'r
 import { RefreshCw, WifiOff } from 'lucide-react-native';
 import { API_URL } from '../config';
 import { temaDe } from '../tema';
-import { useAdminData } from './AdminData';
+import { useAdminData } from './AdminContext';
 import { COLOR, hace, suave } from './utils';
 
 /** Contenedor de cada pantalla de admin: título, scroll y "deslizar para actualizar". */

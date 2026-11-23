@@ -8,7 +8,7 @@ import { distanciaMetros, textoDistancia } from '../utils/distancia';
 import { leerCoordenadas, urlGoogleMaps } from '../utils/ubicacion';
 import { buscarDirecciones, sugerirDireccion } from '../services/api';
 import { CALAMA, temaDe } from '../tema';
-import { useAdminData } from './AdminData';
+import { useAdminData } from './AdminContext';
 import { Boton, Etiqueta, Filtros, Progreso } from './ui';
 import {
   COLOR,

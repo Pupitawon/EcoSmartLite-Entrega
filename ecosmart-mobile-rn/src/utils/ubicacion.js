@@ -30,12 +30,18 @@ export const urlComoLlegar = (lat, lng) =>
   `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=walking`;
 
 // Calama: los resultados de esta zona salen primero, sin descartar el resto de Chile.
-const VIEWBOX_CALAMA = '-69.00,-22.40,-68.85,-22.52';
+const VIEWBOX_CALAMA = '-69.05,-22.38,-68.80,-22.55';
 
-/** Búsqueda de OpenStreetMap (Nominatim): de dirección a puntos, solo en Chile y priorizando Calama. */
-export const urlBuscarDireccion = (texto) =>
-  `https://nominatim.openstreetmap.org/search?${new URLSearchParams({
-    q: String(texto ?? '').trim(),
+/**
+ * Búsqueda de OpenStreetMap (Nominatim): de una dirección escrita a puntos, solo en Chile y priorizando Calama.
+ * Si el texto no dice "Calama" se le agrega (idea de Marcelo: así "Latorre 1500" no se va a otra ciudad).
+ * Pide hasta 5 resultados para que el admin elija cuando la dirección es ambigua.
+ */
+export const urlBuscarDireccion = (texto) => {
+  const limpio = String(texto ?? '').trim().replace(/\s+/g, ' ');
+  const q = /calama/i.test(limpio) ? limpio : `${limpio}, Calama`;
+  return `https://nominatim.openstreetmap.org/search?${new URLSearchParams({
+    q,
     format: 'jsonv2',
     addressdetails: '1',
     countrycodes: 'cl',
@@ -44,13 +50,22 @@ export const urlBuscarDireccion = (texto) =>
     limit: '5',
     'accept-language': 'es',
   })}`;
+};
 
-/** Resultados de la búsqueda -> [{ lat, lng, texto }] con la dirección corta; descarta los que no traen punto válido. */
+const siete = (n) => Number(n.toFixed(7));
+
+/**
+ * Resultados de la búsqueda -> [{ lat, lng, texto }] (7 decimales y dirección corta); descarta los que no traen punto.
+ * Una calle larga viene en varios tramos con el mismo texto: se deja solo el primero (el más relevante).
+ */
 export function resultadosDesdeOSM(lista) {
   if (!Array.isArray(lista)) return [];
+  const vistos = new Set();
   return lista
     .map((r) => ({ lat: Number(r.lat), lng: Number(r.lon), texto: direccionDesdeOSM(r) }))
-    .filter((r) => Number.isFinite(r.lat) && Number.isFinite(r.lng) && r.texto);
+    .filter((r) => Number.isFinite(r.lat) && Number.isFinite(r.lng) && r.texto)
+    .filter((r) => (vistos.has(r.texto) ? false : vistos.add(r.texto)))
+    .map((r) => ({ lat: siete(r.lat), lng: siete(r.lng), texto: r.texto }));
 }
 
 /** Búsqueda inversa de OpenStreetMap (Nominatim): de coordenadas a dirección, en español. */

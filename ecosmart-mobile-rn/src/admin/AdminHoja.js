@@ -184,29 +184,33 @@ function MoverContenedor({ c }) {
   const [pedido, setPedido] = useState(0); // > 0 mientras se pide la ubicación; cada pedido es una búsqueda nueva
   const [direccion, setDireccion] = useState(c.direccion || '');
   const [sugiriendo, setSugiriendo] = useState(false);
-  const [busqueda, setBusqueda] = useState('');
   const [buscando, setBuscando] = useState(false);
-  const [resultados, setResultados] = useState(null); // null = sin buscar; [] = sin resultados
+  const [resultados, setResultados] = useState(null); // varios resultados para elegir; null = nada que elegir
   const [error, setError] = useState('');
   const [guardando, setGuardando] = useState(false);
 
-  // Buscar por dirección: el admin elige uno de los resultados y después puede ajustar el punto tocando el mapa.
+  /**
+   * "Buscar en el mapa" (búsqueda de Marcelo + lista de resultados): busca la dirección escrita en "Dirección o
+   * referencia". Si hay un solo resultado el pin salta ahí; si hay varios, el admin elige. El texto que escribió
+   * no se cambia (puede traer referencias como "frente al Jumbo"). Después puede ajustar el punto tocando el mapa.
+   */
   const buscar = async () => {
-    if (busqueda.trim().length < 3) return setError('Escribe al menos la calle para buscar.');
+    if (direccion.trim().length < 4) return setError('Escribe la dirección para buscarla.');
     setError('');
+    setResultados(null);
     setBuscando(true);
     try {
-      setResultados(await buscarDirecciones(busqueda));
+      const lista = await buscarDirecciones(direccion.trim());
+      if (lista.length === 1) setCentro(fijar(lista[0].lat, lista[0].lng));
+      else setResultados(lista);
     } catch (err) {
       setError(err.message);
-      setResultados(null);
     } finally {
       setBuscando(false);
     }
   };
   const elegirResultado = (r) => {
     setCentro(fijar(r.lat, r.lng));
-    setDireccion(r.texto);
     setResultados(null);
   };
 
@@ -271,45 +275,53 @@ function MoverContenedor({ c }) {
         <Text style={{ fontSize: 18, fontWeight: '900', color: t.texto }}>Contenedor #{c.id_contenedor}: ubicación</Text>
       </View>
       <Text style={{ fontSize: 12, color: t.textoSuave, marginBottom: 10 }}>
-        Busca la dirección, toca el mapa en el lugar nuevo, usa tu ubicación si estás junto al contenedor, o escribe las
-        coordenadas. Después de buscar puedes tocar el mapa para dejar el punto exacto.
+        Escribe la dirección y búscala en el mapa, toca el mapa en el lugar nuevo, usa tu ubicación si estás junto al
+        contenedor, o escribe las coordenadas. Después de buscar puedes tocar el mapa para dejar el punto exacto.
+        Si solo cambias la dirección, deja el punto como está.
       </Text>
 
-      {/* Buscar por dirección (OpenStreetMap, en Chile y priorizando Calama) */}
-      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
-        <TextInput
-          value={busqueda}
-          onChangeText={(v) => { setBusqueda(v); setResultados(null); }}
-          onSubmitEditing={buscar}
-          returnKeyType="search"
-          placeholder="Buscar dirección, ej. Av. Granaderos 2390"
-          placeholderTextColor="#78716c"
-          accessibilityLabel="Buscar dirección"
-          style={[e.campoCoord, { flex: 1, color: t.texto, borderColor: t.campoBorde, backgroundColor: t.campo }]}
-        />
-        {buscando ? <ActivityIndicator color={COLOR.verde} /> : <Boton icono={Search} onPress={buscar}>Buscar</Boton>}
+      {/* Dirección: se guarda con el contenedor y también sirve para buscar el punto en el mapa */}
+      <Text style={[e.rotulo, { color: t.textoSuave }]}>Dirección o referencia</Text>
+      <TextInput
+        value={direccion}
+        onChangeText={(v) => { setDireccion(v); setResultados(null); }}
+        onSubmitEditing={buscar}
+        returnKeyType="search"
+        placeholder="Ej. Av. Granaderos 2390, frente al supermercado"
+        placeholderTextColor="#78716c"
+        maxLength={200}
+        accessibilityLabel="Dirección o referencia"
+        style={[e.campoCoord, { color: t.texto, borderColor: t.campoBorde, backgroundColor: t.campo }]}
+      />
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 8 }}>
+        {buscando ? <ActivityIndicator color={COLOR.verde} /> : (
+          <Boton icono={Search} onPress={buscar}>Buscar en el mapa</Boton>
+        )}
+        {sugiriendo ? <ActivityIndicator color={COLOR.verde} /> : (
+          <Boton icono={MapPin} onPress={sugerir}>Sugerir dirección</Boton>
+        )}
       </View>
       {resultados ? (
-        <View style={[e.resultados, { borderColor: t.borde, backgroundColor: t.superficie }]}>
-          {resultados.length === 0 ? (
-            <Text style={{ fontSize: 12, color: t.textoSuave, padding: 10 }}>
-              No encontramos esa dirección. Prueba solo con la calle, o toca el mapa.
-            </Text>
-          ) : (
-            resultados.map((r, i) => (
-              <Pressable
-                key={`${r.lat},${r.lng},${i}`}
-                onPress={() => elegirResultado(r)}
-                accessibilityRole="button"
-                style={[e.resultado, i > 0 && { borderTopWidth: 1, borderTopColor: t.borde }]}
-              >
-                <MapPin size={14} color={t.textoSuave} />
-                <Text style={{ flex: 1, fontSize: 13, color: t.texto }}>{r.texto}</Text>
-              </Pressable>
-            ))
-          )}
+        <View style={[e.resultados, { borderColor: t.borde, backgroundColor: t.superficie, marginTop: 8 }]}>
+          <Text style={{ fontSize: 11, color: t.textoSuave, paddingHorizontal: 10, paddingTop: 8 }}>
+            Hay varias coincidencias: elige la correcta.
+          </Text>
+          {resultados.map((r, i) => (
+            <Pressable
+              key={`${r.lat},${r.lng},${i}`}
+              onPress={() => elegirResultado(r)}
+              accessibilityRole="button"
+              style={[e.resultado, i > 0 && { borderTopWidth: 1, borderTopColor: t.borde }]}
+            >
+              <MapPin size={14} color={t.textoSuave} />
+              <Text style={{ flex: 1, fontSize: 13, color: t.texto }}>{r.texto}</Text>
+            </Pressable>
+          ))}
         </View>
       ) : null}
+      <Text style={{ fontSize: 11, color: t.textoSuave, marginTop: 6, marginBottom: 10 }}>
+        Con OpenStreetMap: busca el punto de la dirección, o sugiere la dirección del punto. Revisa antes de guardar.
+      </Text>
 
       <View style={[e.mapaMover, { borderColor: t.borde }]}>
         <MapaView pins={[pin]} darkMode={darkMode} seleccionado={pin} posicion={null} centrar={0} centro={centro} onToqueMapa={fijar} />
@@ -344,23 +356,6 @@ function MoverContenedor({ c }) {
             />
           </View>
         ))}
-      </View>
-
-      <Text style={[e.rotulo, { color: t.textoSuave, marginTop: 14 }]}>Dirección o referencia</Text>
-      <TextInput
-        value={direccion}
-        onChangeText={setDireccion}
-        placeholder="Ej. Av. Granaderos 2390, frente al supermercado"
-        placeholderTextColor="#78716c"
-        maxLength={200}
-        accessibilityLabel="Dirección o referencia"
-        style={[e.campoCoord, { color: t.texto, borderColor: t.campoBorde, backgroundColor: t.campo }]}
-      />
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 }}>
-        {sugiriendo ? <ActivityIndicator color={COLOR.verde} /> : (
-          <Boton icono={MapPin} onPress={sugerir}>Sugerir dirección</Boton>
-        )}
-        <Text style={{ flex: 1, fontSize: 11, color: t.textoSuave }}>Desde el punto del mapa (OpenStreetMap). Revísala antes de guardar.</Text>
       </View>
 
       {movido != null && movido >= 1 ? (

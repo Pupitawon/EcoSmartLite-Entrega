@@ -94,8 +94,8 @@ export async function sugerirDireccion(lat, lng) {
 }
 
 /**
- * Busca una dirección escrita (ej. "Av. Granaderos 2390") con OpenStreetMap, en Chile y priorizando Calama.
- * Devuelve hasta 5 resultados [{ lat, lng, texto }] (puede ser [] si no encuentra nada).
+ * Busca en el mapa una dirección escrita (ej. "Av. Granaderos 2390") con OpenStreetMap, en Chile y priorizando Calama.
+ * Devuelve hasta 5 resultados [{ lat, lng, texto }]. Lanza un Error con el motivo si no encuentra nada.
  */
 export async function buscarDirecciones(texto) {
   const ctrl = new AbortController();
@@ -103,9 +103,11 @@ export async function buscarDirecciones(texto) {
   try {
     const res = await fetch(urlBuscarDireccion(texto), { signal: ctrl.signal, headers: { Accept: 'application/json' } });
     if (!res.ok) throw new Error(`OpenStreetMap respondió ${res.status}.`);
-    return resultadosDesdeOSM(await res.json());
+    const lista = resultadosDesdeOSM(await res.json());
+    if (!lista.length) throw new Error('No encontré esa dirección. Prueba con calle y número, o toca el mapa.');
+    return lista;
   } catch (e) {
-    if (e.name === 'AbortError') throw new Error('OpenStreetMap tardó demasiado. Inténtalo de nuevo o toca el mapa.');
+    if (e.name === 'AbortError') throw new Error('OpenStreetMap tardó demasiado. Toca el mapa en el lugar.');
     throw e;
   } finally {
     clearTimeout(reloj);

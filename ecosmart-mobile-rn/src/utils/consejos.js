@@ -14,3 +14,11 @@ export const CONSEJOS = [
 export function consejoDelDia(fecha = new Date()) {
   return CONSEJOS[fecha.getDay()];
 }
+
+
+/** Saludo según la hora local: antes de las 15:00 es de mañana, hasta las 20:00 de tarde y después de noche. */
+export function saludoDe(hora = new Date().getHours()) {
+  if (hora < 15) return 'Buenos días';
+  if (hora < 20) return 'Buenas tardes';
+  return 'Buenas noches';
+}

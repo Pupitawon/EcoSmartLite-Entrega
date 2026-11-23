@@ -1,6 +1,6 @@
 import { API_URL } from '../config';
 import { auth } from '../firebase';
-import { direccionDesdeOSM, puntoDesdeOSM, urlBuscarNominatim, urlNominatim } from '../utils/ubicacion';
+import { direccionDesdeOSM, resultadosDesdeOSM, urlBuscarDireccion, urlNominatim } from '../utils/ubicacion';
 
 const TIMEOUT_MS = 10000;
 
@@ -93,17 +93,19 @@ export async function sugerirDireccion(lat, lng) {
   }
 }
 
-
-// Punto del mapa para una dirección escrita. Lanza un Error con el motivo si no la encuentra.
-export async function buscarPuntoDeDireccion(texto) {
+/**
+ * Busca en el mapa una dirección escrita (ej. "Av. Granaderos 2390") con OpenStreetMap, en Chile y priorizando Calama.
+ * Devuelve hasta 5 resultados [{ lat, lng, texto }]. Lanza un Error con el motivo si no encuentra nada.
+ */
+export async function buscarDirecciones(texto) {
   const ctrl = new AbortController();
   const reloj = setTimeout(() => ctrl.abort(), 8000);
   try {
-    const res = await fetch(urlBuscarNominatim(texto), { signal: ctrl.signal, headers: { Accept: 'application/json' } });
+    const res = await fetch(urlBuscarDireccion(texto), { signal: ctrl.signal, headers: { Accept: 'application/json' } });
     if (!res.ok) throw new Error(`OpenStreetMap respondió ${res.status}.`);
-    const punto = puntoDesdeOSM(await res.json());
-    if (!punto) throw new Error('No encontré esa dirección. Prueba con calle y número, o toca el mapa.');
-    return punto;
+    const lista = resultadosDesdeOSM(await res.json());
+    if (!lista.length) throw new Error('No encontré esa dirección. Prueba con calle y número, o toca el mapa.');
+    return lista;
   } catch (e) {
     if (e.name === 'AbortError') throw new Error('OpenStreetMap tardó demasiado. Toca el mapa en el lugar.');
     throw e;

@@ -5,8 +5,8 @@ import MapaView from '../components/MapaView';
 import useUbicacion from '../hooks/useUbicacion';
 import { aPin } from '../utils/pines';
 import { distanciaMetros, textoDistancia } from '../utils/distancia';
-import { buscarPuntoDeDireccion, sugerirDireccion } from '../services/api';
-import { sugerirDireccion } from '../services/api';
+import { leerCoordenadas, urlGoogleMaps } from '../utils/ubicacion';
+import { buscarDirecciones, sugerirDireccion } from '../services/api';
 import { CALAMA, temaDe } from '../tema';
 import { useAdminData } from './AdminData';
 import { Boton, Etiqueta, Filtros, Progreso } from './ui';
@@ -185,8 +185,34 @@ function MoverContenedor({ c }) {
   const [direccion, setDireccion] = useState(c.direccion || '');
   const [sugiriendo, setSugiriendo] = useState(false);
   const [buscando, setBuscando] = useState(false);
+  const [resultados, setResultados] = useState(null); // varios resultados para elegir; null = nada que elegir
   const [error, setError] = useState('');
   const [guardando, setGuardando] = useState(false);
+
+  /**
+   * "Buscar en el mapa" (búsqueda de Marcelo + lista de resultados): busca la dirección escrita en "Dirección o
+   * referencia". Si hay un solo resultado el pin salta ahí; si hay varios, el admin elige. El texto que escribió
+   * no se cambia (puede traer referencias como "frente al Jumbo"). Después puede ajustar el punto tocando el mapa.
+   */
+  const buscar = async () => {
+    if (direccion.trim().length < 4) return setError('Escribe la dirección para buscarla.');
+    setError('');
+    setResultados(null);
+    setBuscando(true);
+    try {
+      const lista = await buscarDirecciones(direccion.trim());
+      if (lista.length === 1) setCentro(fijar(lista[0].lat, lista[0].lng));
+      else setResultados(lista);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBuscando(false);
+    }
+  };
+  const elegirResultado = (r) => {
+    setCentro(fijar(r.lat, r.lng));
+    setResultados(null);
+  };
 
   // Completa la dirección desde el punto del mapa (OpenStreetMap). El admin la revisa antes de guardar.
   const sugerir = async () => {
@@ -208,22 +234,6 @@ function MoverContenedor({ c }) {
     setTxt({ lat: String(p.lat), lng: String(p.lng) });
     setError('');
     return p;
-  };
-
-
-  // Lleva el pin a la dirección escrita. El admin ve dónde cayó y puede ajustarlo tocando el mapa.
-  const buscar = async () => {
-    if (direccion.trim().length < 4) return setError('Escribe la dirección para buscarla.');
-    setError('');
-    setBuscando(true);
-    try {
-      const p = await buscarPuntoDeDireccion(direccion.trim());
-      setCentro(fijar(p.lat, p.lng));
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBuscando(false);
-    }
   };
 
   const usarUbicacion = (lat, lng) => {
@@ -265,8 +275,52 @@ function MoverContenedor({ c }) {
         <Text style={{ fontSize: 18, fontWeight: '900', color: t.texto }}>Contenedor #{c.id_contenedor}: ubicación</Text>
       </View>
       <Text style={{ fontSize: 12, color: t.textoSuave, marginBottom: 10 }}>
-        Toca el mapa en el lugar nuevo, escribe la dirección y búscala, usa tu ubicación si estás junto al contenedor,
-        o escribe las coordenadas. Si solo cambias la dirección, deja el punto como está.
+        Escribe la dirección y búscala en el mapa, toca el mapa en el lugar nuevo, usa tu ubicación si estás junto al
+        contenedor, o escribe las coordenadas. Después de buscar puedes tocar el mapa para dejar el punto exacto.
+        Si solo cambias la dirección, deja el punto como está.
+      </Text>
+
+      {/* Dirección: se guarda con el contenedor y también sirve para buscar el punto en el mapa */}
+      <Text style={[e.rotulo, { color: t.textoSuave }]}>Dirección o referencia</Text>
+      <TextInput
+        value={direccion}
+        onChangeText={(v) => { setDireccion(v); setResultados(null); }}
+        onSubmitEditing={buscar}
+        returnKeyType="search"
+        placeholder="Ej. Av. Granaderos 2390, frente al supermercado"
+        placeholderTextColor="#78716c"
+        maxLength={200}
+        accessibilityLabel="Dirección o referencia"
+        style={[e.campoCoord, { color: t.texto, borderColor: t.campoBorde, backgroundColor: t.campo }]}
+      />
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 8 }}>
+        {buscando ? <ActivityIndicator color={COLOR.verde} /> : (
+          <Boton icono={Search} onPress={buscar}>Buscar en el mapa</Boton>
+        )}
+        {sugiriendo ? <ActivityIndicator color={COLOR.verde} /> : (
+          <Boton icono={MapPin} onPress={sugerir}>Sugerir dirección</Boton>
+        )}
+      </View>
+      {resultados ? (
+        <View style={[e.resultados, { borderColor: t.borde, backgroundColor: t.superficie, marginTop: 8 }]}>
+          <Text style={{ fontSize: 11, color: t.textoSuave, paddingHorizontal: 10, paddingTop: 8 }}>
+            Hay varias coincidencias: elige la correcta.
+          </Text>
+          {resultados.map((r, i) => (
+            <Pressable
+              key={`${r.lat},${r.lng},${i}`}
+              onPress={() => elegirResultado(r)}
+              accessibilityRole="button"
+              style={[e.resultado, i > 0 && { borderTopWidth: 1, borderTopColor: t.borde }]}
+            >
+              <MapPin size={14} color={t.textoSuave} />
+              <Text style={{ flex: 1, fontSize: 13, color: t.texto }}>{r.texto}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+      <Text style={{ fontSize: 11, color: t.textoSuave, marginTop: 6, marginBottom: 10 }}>
+        Con OpenStreetMap: busca el punto de la dirección, o sugiere la dirección del punto. Revisa antes de guardar.
       </Text>
 
       <View style={[e.mapaMover, { borderColor: t.borde }]}>
@@ -303,28 +357,6 @@ function MoverContenedor({ c }) {
           </View>
         ))}
       </View>
-
-      <Text style={[e.rotulo, { color: t.textoSuave, marginTop: 14 }]}>Dirección o referencia</Text>
-      <TextInput
-        value={direccion}
-        onChangeText={setDireccion}
-        placeholder="Ej. Av. Granaderos 2390, frente al supermercado"
-        placeholderTextColor="#78716c"
-        maxLength={200}
-        accessibilityLabel="Dirección o referencia"
-        style={[e.campoCoord, { color: t.texto, borderColor: t.campoBorde, backgroundColor: t.campo }]}
-      />
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 }}>
-        {buscando ? <ActivityIndicator color={COLOR.verde} /> : (
-          <Boton icono={Search} onPress={buscar}>Buscar en el mapa</Boton>
-        )}
-        {sugiriendo ? <ActivityIndicator color={COLOR.verde} /> : (
-          <Boton icono={MapPin} onPress={sugerir}>Sugerir dirección</Boton>
-        )}
-      </View>
-      <Text style={{ fontSize: 11, color: t.textoSuave, marginTop: 6 }}>
-        Con OpenStreetMap: busca el punto de la dirección, o sugiere la dirección del punto. Revisa antes de guardar.
-      </Text>
 
       {movido != null && movido >= 1 ? (
         <Text style={{ fontSize: 12, color: movido > 5000 ? COLOR.ambar : t.textoSuave, marginTop: 8 }}>
@@ -445,6 +477,8 @@ const e = StyleSheet.create({
   mapaMini: { height: 180, borderWidth: 1, borderRadius: 16, overflow: 'hidden', position: 'relative' },
   mapaMover: { height: 300, borderWidth: 1, borderRadius: 16, overflow: 'hidden', position: 'relative' },
   campoCoord: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14 },
+  resultados: { borderWidth: 1, borderRadius: 12, marginBottom: 8, overflow: 'hidden' },
+  resultado: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 9 },
   rotulo: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 },
   datos: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 16, rowGap: 12 },
   fila: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth },

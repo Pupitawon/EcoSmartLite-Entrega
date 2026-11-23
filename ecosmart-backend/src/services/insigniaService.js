@@ -65,22 +65,6 @@ function calcularLogros(valores, definiciones) {
   });
 }
 
-/** Nivel de cada logro según `valores` ({ depositante, racha, botellas }) y avance hacia el nivel siguiente. */
-function calcularLogros(valores) {
-  return LOGROS.map((l) => {
-    const valor = Math.max(0, Number(valores[l.id]) || 0);
-    const nivel = l.niveles.filter((n) => valor >= n).length;
-    const meta = l.niveles[nivel] ?? null; // null: ya está en el nivel máximo
-    const base = nivel > 0 ? l.niveles[nivel - 1] : 0;
-    return {
-      id: l.id, icono: l.icono, titulo: l.titulo, unidad: l.unidad,
-      niveles: l.niveles.map((requerido, i) => ({ nivel: i + 1, requerido, alcanzado: valor >= requerido })),
-      valor, nivel, niveles_totales: l.niveles.length, meta,
-      avance: meta === null ? 1 : (valor - base) / (meta - base),
-    };
-  });
-}
-
 /** Insignias del usuario (todas, con las desbloqueadas marcadas), avance hacia la siguiente y racha. */
 async function resumenInsignias(idAuth) {
   const { rows: u } = await pool.query('SELECT id_usuario FROM usuario WHERE id_auth = $1', [idAuth]);

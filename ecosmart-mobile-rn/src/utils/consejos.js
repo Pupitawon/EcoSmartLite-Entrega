@@ -16,9 +16,9 @@ export function consejoDelDia(fecha = new Date()) {
 }
 
 
-/** Saludo según la hora local: antes de las 15:00 es de mañana, hasta las 20:00 de tarde y después de noche. */
+/** Saludo según la hora local: de 6:00 a 14:59 es de día, de 15:00 a 21:59 de tarde y desde las 22:00 (hasta la madrugada) de noche. */
 export function saludoDe(hora = new Date().getHours()) {
-  if (hora < 15) return 'Buenos días';
-  if (hora < 20) return 'Buenas tardes';
+  if (hora >= 6 && hora < 15) return 'Buenos días';
+  if (hora >= 15 && hora < 22) return 'Buenas tardes';
   return 'Buenas noches';
 }

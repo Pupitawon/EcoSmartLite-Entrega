@@ -20,10 +20,13 @@ test('cada día de la semana tiene su consejo y se repite a la semana siguiente'
 
 
 test('el saludo cambia según la hora del día', () => {
+  assert.equal(saludoDe(0), 'Buenas noches');
+  assert.equal(saludoDe(5), 'Buenas noches');
+  assert.equal(saludoDe(6), 'Buenos días');
   assert.equal(saludoDe(10), 'Buenos días');
   assert.equal(saludoDe(14), 'Buenos días');
   assert.equal(saludoDe(15), 'Buenas tardes');
-  assert.equal(saludoDe(19), 'Buenas tardes');
-  assert.equal(saludoDe(20), 'Buenas noches');
+  assert.equal(saludoDe(21), 'Buenas tardes');
+  assert.equal(saludoDe(22), 'Buenas noches');
   assert.equal(saludoDe(23), 'Buenas noches');
 });

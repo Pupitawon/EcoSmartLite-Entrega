@@ -9,6 +9,7 @@ import { obtenerInsignias } from './src/services/insignias';
 import { temaDe } from './src/tema';
 import Header from './src/components/Header';
 import BottomNav from './src/components/BottomNav';
+import AvisoReciclaje from './src/components/AvisoReciclaje';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import RecuperarClaveScreen from './src/screens/RecuperarClaveScreen';
@@ -196,7 +197,10 @@ export default function App() {
               onPerfilActualizado={(p) => setPerfil((x) => ({ ...x, recibe_notificaciones: p.recibe_notificaciones }))}
             />
           ) : (
-            <MapaScreen darkMode={darkMode} onViewStation={(s) => { setEstacion(s); setPantalla('estacion'); }} />
+            <View style={{ flex: 1 }}>
+              <AvisoReciclaje darkMode={darkMode} racha={racha} saldo={perfil.saldo_ecopoints} notificaciones={perfil.recibe_notificaciones !== false} />
+              <MapaScreen darkMode={darkMode} onViewStation={(s) => { setEstacion(s); setPantalla('estacion'); }} />
+            </View>
           )}
         </View>
         {/* El perfil y la configuración ocupan toda la pantalla (como en Duolingo): sin encabezado ni barra inferior. */}

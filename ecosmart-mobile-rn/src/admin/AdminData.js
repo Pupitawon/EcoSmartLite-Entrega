@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import {
   actualizarReporte,
@@ -14,6 +14,10 @@ import {
 } from '../services/api';
 import { ESTADO_REPORTE, criterios, material, ubicacion } from './utils';
 import AdminHoja from './AdminHoja';
+import { AdminDataContext } from './AdminContext';
+
+// Se vuelve a exportar para que las pantallas sigan importándolo desde acá.
+export { useAdminData } from './AdminContext';
 
 /**
  * Datos del panel de administración (reemplaza al panel web del backend):
@@ -21,7 +25,6 @@ import AdminHoja from './AdminHoja';
  * Se vuelven a consultar solos cada 15 s (y al deslizar hacia abajo en cada pantalla).
  * Las órdenes de trabajo (tabla orden_trabajo) las comparten todos los administradores.
  */
-const AdminDataContext = createContext(null);
 const CADA_MS = 15000;
 const CONFIG_POR_DEFECTO = { umbral_alerta: 80, sin_reporte_horas: 6 };
 

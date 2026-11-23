@@ -1,8 +1,8 @@
-import { consejoDelDia, saludoDe } from '../utils/consejos';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Flame, Lightbulb, X } from 'lucide-react-native';
 import { obtenerDesafios } from '../services/desafios';
-import { consejoDelDia } from '../utils/consejos';
+import { consejoDelDia, saludoDe } from '../utils/consejos';
 import { temaDe } from '../tema';
 
 /**

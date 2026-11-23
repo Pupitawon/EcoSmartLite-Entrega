@@ -32,13 +32,38 @@ function calcularRacha(dias, hoy) {
   return { actual, maxima };
 }
 
-// Logros por niveles (estilo Duolingo). No dependen de las tablas insignia/logro_usuario: se calculan
-// con los depósitos del usuario. `niveles` son los valores que hay que alcanzar para subir de nivel.
-const LOGROS = [
-  { id: 'depositante', icono: 'recycle', titulo: 'Reciclador constante', unidad: 'depósitos', niveles: [1, 5, 15, 30, 60] },
-  { id: 'racha', icono: 'flame', titulo: 'Racha imparable', unidad: 'días seguidos', niveles: [3, 7, 14, 30] },
-  { id: 'botellas', icono: 'botella', titulo: 'Botellas recicladas', unidad: 'botellas', niveles: [10, 50, 150, 300, 600] },
-];
+// Los logros y sus niveles viven en la base (tablas logro y logro_nivel).
+// `niveles` son los valores que hay que alcanzar para subir de nivel.
+async function cargarLogros() {
+  const { rows } = await pool.query(
+    `SELECT l.id_logro, l.icono, l.titulo, l.unidad, n.requerido
+       FROM logro l
+       JOIN logro_nivel n ON n.id_logro = l.id_logro
+      ORDER BY l.orden, l.id_logro, n.nivel`
+  );
+  const por = new Map();
+  for (const r of rows) {
+    if (!por.has(r.id_logro)) por.set(r.id_logro, { id: r.id_logro, icono: r.icono, titulo: r.titulo, unidad: r.unidad, niveles: [] });
+    por.get(r.id_logro).niveles.push(r.requerido);
+  }
+  return [...por.values()];
+}
+
+/** Nivel de cada logro según `valores` ({ depositante, racha, botellas }) y avance hacia el nivel siguiente. */
+function calcularLogros(valores, definiciones) {
+  return definiciones.map((l) => {
+    const valor = Math.max(0, Number(valores[l.id]) || 0);
+    const nivel = l.niveles.filter((n) => valor >= n).length;
+    const meta = l.niveles[nivel] ?? null; // null: ya está en el nivel máximo
+    const base = nivel > 0 ? l.niveles[nivel - 1] : 0;
+    return {
+      id: l.id, icono: l.icono, titulo: l.titulo, unidad: l.unidad,
+      niveles: l.niveles.map((requerido, i) => ({ nivel: i + 1, requerido, alcanzado: valor >= requerido })),
+      valor, nivel, niveles_totales: l.niveles.length, meta,
+      avance: meta === null ? 1 : (valor - base) / (meta - base),
+    };
+  });
+}
 
 /** Nivel de cada logro según `valores` ({ depositante, racha, botellas }) y avance hacia el nivel siguiente. */
 function calcularLogros(valores) {
@@ -62,7 +87,7 @@ async function resumenInsignias(idAuth) {
   if (!u[0]) return null;
   const idUsuario = u[0].id_usuario;
 
-  const [{ rows: ins }, { rows: dep }, { rows: dias }, { rows: hoy }, { rows: bot }] = await Promise.all([
+  const [{ rows: ins }, { rows: dep }, { rows: dias }, { rows: hoy }, { rows: bot }, definiciones] = await Promise.all([
     pool.query(
       `SELECT i.id_insignia, i.nombre_insignia, i.descripcion, i.umbral_depositos, l.fecha_desbloqueo
          FROM insignia i
@@ -80,6 +105,7 @@ async function resumenInsignias(idAuth) {
     ),
     pool.query(`SELECT to_char((NOW() AT TIME ZONE '${ZONA}')::date, 'YYYY-MM-DD') AS hoy`),
     pool.query('SELECT COALESCE(SUM(cantidad_premiada), 0)::int AS n FROM deposito_residuo WHERE id_usuario = $1', [idUsuario]),
+    cargarLogros(),
   ]);
 
   const depositos = dep[0].n;
@@ -97,7 +123,7 @@ async function resumenInsignias(idAuth) {
   return {
     depositos,
     botellas: bot[0].n,
-    logros: calcularLogros({ depositante: depositos, racha: racha.maxima, botellas: bot[0].n }),
+    logros: calcularLogros({ depositante: depositos, racha: racha.maxima, botellas: bot[0].n }, definiciones),
     insignias_desbloqueadas: insignias.filter((i) => i.desbloqueada).length,
     insignias_totales: insignias.length,
     racha,
@@ -110,4 +136,4 @@ async function resumenInsignias(idAuth) {
   };
 }
 
-module.exports = { resumenInsignias, calcularRacha, calcularLogros };
+module.exports = { resumenInsignias, calcularRacha, calcularLogros, cargarLogros };

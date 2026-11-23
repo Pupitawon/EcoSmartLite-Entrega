@@ -31,7 +31,7 @@ const token = ({ sub, email = `${sub}@mail.cl`, exp = '10m', aud = PROJECT } = {
     .setIssuedAt().setExpirationTime(exp).sign(privateKey);
 
 
-const { calcularRacha, calcularLogros } = require('../src/services/insigniaService');
+const { calcularRacha, calcularLogros, cargarLogros } = require('../src/services/insigniaService');
 const UID = 'uid-test-ins-1';
 const ID_BASE = 990000; // ids altos para no chocar con otros datos
 
@@ -43,6 +43,8 @@ async function limpiar() {
   await pool.query('DELETE FROM tipo_material WHERE id_material = $1', [ID_BASE]);
 }
 before(limpiar);
+let DEFS;
+before(async () => { DEFS = await cargarLogros(); });
 const get = (t) => fetch(`${base}/api/usuarios/me/insignias`, { headers: t ? { Authorization: `Bearer ${t}` } : {} });
 
 test('racha: días seguidos, viva si el último depósito fue hoy o ayer', () => {
@@ -53,7 +55,7 @@ test('racha: días seguidos, viva si el último depósito fue hoy o ayer', () =>
 });
 
 test('logros: nivel y avance según el valor', () => {
-  const por = (v) => Object.fromEntries(calcularLogros(v).map((l) => [l.id, l]));
+  const por = (v) => Object.fromEntries(calcularLogros(v, DEFS).map((l) => [l.id, l]));
   const cero = por({ depositante: 0, racha: 0, botellas: 0 });
   assert.equal(cero.depositante.nivel, 0);
   assert.equal(cero.depositante.meta, 1);

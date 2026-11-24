@@ -79,7 +79,7 @@ export default function RecuperarClaveScreen({ darkMode, onBack }) {
               autoCapitalize="characters"
               onSubmitEditing={enviar}
               returnKeyType="send"
-              placeholder="12345678-5"
+              placeholder="RUT con guion, sin puntos"
             />
 
             {!!error && <Text style={{ color: t.error, fontSize: 12, fontWeight: '500', marginBottom: 8 }}>{error}</Text>}

@@ -6,7 +6,7 @@ import { ANOMALY_TYPES, STATUS_META, getPinStatus, horaLocal, temaDe } from '../
 
 /**
  * Detalle de la estación (se llega desde la tarjeta de un pin del mapa) con el flujo de
- * reporte ciudadano de anomalías (HU-06 / RF-05), igual que la app de Jeremy.
+ * reporte ciudadano de anomalías (HU-06 / RF-05).
  */
 export default function EstacionScreen({ station, darkMode, onBack }) {
   const t = temaDe(darkMode);

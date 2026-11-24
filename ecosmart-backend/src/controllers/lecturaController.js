@@ -2,8 +2,8 @@ const { lecturaSchema, registrarLectura } = require('../services/lecturaService'
 
 /**
  * Valida y guarda una lectura. Lo comparten:
- *  - POST /api/lecturas             (contrato nuevo, responde 201)
- *  - PUT  /api/contenedores/:id/nivel (ruta antigua del ESP32/simulación, responde 200)
+ *  - POST /api/lecturas               (responde 201)
+ *  - PUT  /api/contenedores/:id/nivel (lectura simple del ESP32, responde 200)
  */
 async function aplicarLectura(input, res, next, { okStatus = 201, conMensaje = false } = {}) {
   const parsed = lecturaSchema.safeParse(input);

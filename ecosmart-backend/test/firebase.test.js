@@ -65,7 +65,7 @@ test('basura que parece JWT → 401; la API key sigue funcionando', async () => 
   assert.equal((await enviar(process.env.INGEST_API_KEY)).status, 201);
 });
 
-test('el token de Firebase también sirve en la ruta antigua PUT /nivel', async () => {
+test('el token de Firebase también sirve en la ruta PUT /nivel', async () => {
   const r = await fetch(`${base}/api/contenedores/101/nivel`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await token({ claims: { ingest: true } })}` },

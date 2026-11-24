@@ -34,7 +34,7 @@ import ReportesScreen from './src/screens/admin/ReportesScreen';
 import OrdenesScreen from './src/screens/admin/OrdenesScreen';
 import IndicadoresScreen from './src/screens/admin/IndicadoresScreen';
 
-// Pestañas del administrador (Innova Recicla). Reemplazan al antiguo panel web del backend.
+// Pestañas del administrador (Innova Recicla).
 // El avatar del encabezado abre Mi perfil → Configuración (ahí está cerrar sesión, con confirmación).
 const ADMIN_ITEMS = [
   { id: 'contenedores', icon: Boxes, label: 'Contenedores' },
@@ -54,7 +54,7 @@ const ADMIN_PANTALLAS = {
 const inicioDe = (p) => (p?.es_admin ? 'contenedores' : 'mapa'); // el admin empieza en la lista; el ciudadano en su mapa
 
 export default function App() {
-  const [darkMode, setDarkMode] = useState(true); // como la app de Jeremy
+  const [darkMode, setDarkMode] = useState(true); // arranca en modo oscuro
   const [pantalla, setPantalla] = useState('login'); // login | registro | recuperar | mapa | estacion | escanear | desafios | ranking | perfil | (admin) contenedores, alertas…
   const [perfil, setPerfil] = useState(null);
   const [estacion, setEstacion] = useState(null);

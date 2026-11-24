@@ -7,7 +7,7 @@ const { requireIngestAuth } = require('../middleware/ingestAuth');
 const { limiteLecturas } = require('../middleware/rateLimit');
 
 router.get('/', getContenedores);
-// Ruta antigua para lecturas del ESP32 / simulación. Ahora exige credencial (API key) igual que POST /api/lecturas.
+// Lectura simple del ESP32 o de la simulación. Exige la credencial (API key), igual que POST /api/lecturas.
 router.put('/:id/nivel', limiteLecturas, requireIngestAuth, updateNivelLlenado);
 router.get('/conexion', getEstadoConexion); // ?solo_problemas=1
 // Solo administradores: el contenedor se trasladó o se corrige su ubicación. { latitud, longitud }

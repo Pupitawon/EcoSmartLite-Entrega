@@ -98,10 +98,10 @@ export default function AdministradoresScreen({ darkMode, onVolver }) {
 
       <Text style={[etiqueta, { marginTop: 8 }]}>NUEVO ADMINISTRADOR</Text>
       <View style={[e.tarjeta, { backgroundColor: t.superficie, borderColor: t.borde, padding: 16 }]}>
-        <Campo darkMode={darkMode} Icono={User} etiqueta="Nombre completo" value={f.nombre_completo} onChangeText={set('nombre_completo')} placeholder="Ana Pérez" />
-        <Campo darkMode={darkMode} Icono={Mail} etiqueta="Correo" value={f.correo} onChangeText={set('correo')} placeholder="ana@innovarecicla.cl" autoCapitalize="none" keyboardType="email-address" />
-        <Campo darkMode={darkMode} Icono={Phone} etiqueta="Teléfono" value={f.telefono} onChangeText={set('telefono')} placeholder="9 1234 5678" keyboardType="phone-pad" />
-        <Campo darkMode={darkMode} Icono={IdCard} etiqueta="RUT" value={f.rut} onChangeText={set('rut')} placeholder="12345678-5" autoCapitalize="characters" />
+        <Campo darkMode={darkMode} Icono={User} etiqueta="Nombre completo" value={f.nombre_completo} onChangeText={set('nombre_completo')} placeholder="Nombre y apellido" />
+        <Campo darkMode={darkMode} Icono={Mail} etiqueta="Correo" value={f.correo} onChangeText={set('correo')} placeholder="correo@dominio.cl" autoCapitalize="none" keyboardType="email-address" />
+        <Campo darkMode={darkMode} Icono={Phone} etiqueta="Teléfono" value={f.telefono} onChangeText={set('telefono')} placeholder="Celular de 9 dígitos" keyboardType="phone-pad" />
+        <Campo darkMode={darkMode} Icono={IdCard} etiqueta="RUT" value={f.rut} onChangeText={set('rut')} placeholder="RUT con guion, sin puntos" autoCapitalize="characters" />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 }}>
           <KeyRound size={18} color={t.texto} />
           <View style={{ flex: 1 }}>

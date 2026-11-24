@@ -287,7 +287,7 @@ function MoverContenedor({ c }) {
         onChangeText={(v) => { setDireccion(v); setResultados(null); }}
         onSubmitEditing={buscar}
         returnKeyType="search"
-        placeholder="Ej. Av. Granaderos 2390, frente al supermercado"
+        placeholder="Calle y número, o una referencia cercana"
         placeholderTextColor="#78716c"
         maxLength={200}
         accessibilityLabel="Dirección o referencia"

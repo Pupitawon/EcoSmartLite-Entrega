@@ -46,8 +46,8 @@ export default function RegisterScreen({ darkMode, onRegistered, onBack }) {
         </Pressable>
         <Text style={{ fontSize: 18, fontWeight: '800', color: t.texto, marginBottom: 16 }}>Crear cuenta</Text>
 
-        <Campo darkMode={darkMode} Icono={User} etiqueta="Nombre completo" value={f.nombre} onChangeText={set('nombre')} autoCapitalize="words" autoComplete="name" placeholder="Ana Pérez" />
-        <Campo darkMode={darkMode} Icono={CreditCard} etiqueta="RUT" value={f.rut} onChangeText={set('rut')} autoCapitalize="characters" placeholder="12345678-5" />
+        <Campo darkMode={darkMode} Icono={User} etiqueta="Nombre completo" value={f.nombre} onChangeText={set('nombre')} autoCapitalize="words" autoComplete="name" placeholder="Nombre y apellido" />
+        <Campo darkMode={darkMode} Icono={CreditCard} etiqueta="RUT" value={f.rut} onChangeText={set('rut')} autoCapitalize="characters" placeholder="RUT con guion, sin puntos" />
         <Campo darkMode={darkMode} Icono={Mail} etiqueta="Correo" value={f.correo} onChangeText={set('correo')} autoCapitalize="none" keyboardType="email-address" autoComplete="email" placeholder="tucorreo@ejemplo.cl" />
         <Campo darkMode={darkMode} Icono={Lock} etiqueta="Contraseña" value={f.clave} onChangeText={set('clave')} secureTextEntry placeholder="Mínimo 8 caracteres" />
         <RequisitosClave clave={f.clave} darkMode={darkMode} />

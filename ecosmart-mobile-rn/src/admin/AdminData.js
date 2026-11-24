@@ -28,11 +28,6 @@ export { useAdminData } from './AdminContext';
 const CADA_MS = 15000;
 const CONFIG_POR_DEFECTO = { umbral_alerta: 80, sin_reporte_horas: 6 };
 
-export function useAdminData() {
-  const ctx = useContext(AdminDataContext);
-  if (!ctx) throw new Error('useAdminData debe usarse dentro de <AdminDataProvider>');
-  return ctx;
-}
 
 export function AdminDataProvider({ children, darkMode, onIrA }) {
   const [contenedores, setContenedores] = useState([]);

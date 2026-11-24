@@ -149,7 +149,7 @@ export default function App() {
             <Header
               darkMode={darkMode}
               toggleDarkMode={() => setDarkMode((d) => !d)}
-              inicial="A"
+              inicial={perfil.nombre_completo?.charAt(0).toUpperCase() || 'A'}
               admin
               onPerfil={() => { setAdminPrevia(ADMIN_PANTALLAS[pantalla] ? pantalla : 'contenedores'); setPantalla('perfil'); }}
             />

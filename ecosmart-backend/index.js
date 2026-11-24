@@ -9,7 +9,7 @@ const usuarioRoutes = require('./src/routes/usuarioRoutes');
 const lecturaRoutes = require('./src/routes/lecturaRoutes');
 const streamRoutes = require('./src/routes/streamRoutes');
 const reporteRoutes = require('./src/routes/reporteRoutes');
-const depositoRoutes = require('./src/routes/depositoRoutes'); // <-- 1. Importa las rutas de depósitos
+const depositoRoutes = require('./src/routes/depositoRoutes'); // depósitos de residuos (QR)
 const ordenRoutes = require('./src/routes/ordenRoutes');
 const administradorRoutes = require('./src/routes/administradorRoutes');
 
@@ -32,7 +32,7 @@ app.use('/api/usuarios', usuarioRoutes);
 app.use('/api/lecturas', lecturaRoutes);
 app.use('/api/stream', streamRoutes);
 app.use('/api/reportes', reporteRoutes);
-app.use('/api/depositos', depositoRoutes); // <-- 2. Registra la ruta base para los depósitos
+app.use('/api/depositos', depositoRoutes); // depósitos de residuos (QR)
 app.use('/api/ordenes', ordenRoutes); // órdenes de trabajo del panel de administración (solo administradores)
 app.use('/api/administradores', administradorRoutes); // gestión de administradores (solo súper usuario)
 

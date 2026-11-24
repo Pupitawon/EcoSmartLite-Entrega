@@ -190,7 +190,7 @@ function MoverContenedor({ c }) {
   const [guardando, setGuardando] = useState(false);
 
   /**
-   * "Buscar en el mapa" (búsqueda de Marcelo + lista de resultados): busca la dirección escrita en "Dirección o
+   * "Buscar en el mapa": busca la dirección escrita en "Dirección o
    * referencia". Si hay un solo resultado el pin salta ahí; si hay varios, el admin elige. El texto que escribió
    * no se cambia (puede traer referencias como "frente al Jumbo"). Después puede ajustar el punto tocando el mapa.
    */

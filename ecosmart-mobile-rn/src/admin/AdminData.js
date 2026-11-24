@@ -20,7 +20,7 @@ import { AdminDataContext } from './AdminContext';
 export { useAdminData } from './AdminContext';
 
 /**
- * Datos del panel de administración (reemplaza al panel web del backend):
+ * Datos del panel de administración:
  * contenedores, alertas, reportes ciudadanos y órdenes de trabajo, todo desde el backend.
  * Se vuelven a consultar solos cada 15 s (y al deslizar hacia abajo en cada pantalla).
  * Las órdenes de trabajo (tabla orden_trabajo) las comparten todos los administradores.

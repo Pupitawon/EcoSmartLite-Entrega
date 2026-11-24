@@ -34,7 +34,7 @@ const VIEWBOX_CALAMA = '-69.05,-22.38,-68.80,-22.55';
 
 /**
  * Búsqueda de OpenStreetMap (Nominatim): de una dirección escrita a puntos, solo en Chile y priorizando Calama.
- * Si el texto no dice "Calama" se le agrega (idea de Marcelo: así "Latorre 1500" no se va a otra ciudad).
+ * Si el texto no dice "Calama" se le agrega, así "Latorre 1500" no se va a otra ciudad.
  * Pide hasta 5 resultados para que el admin elija cuando la dirección es ambigua.
  */
 export const urlBuscarDireccion = (texto) => {

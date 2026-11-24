@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-// Corregido: el archivo se llama alertasController.js (antes se importaba "alertaController" y el servidor no arrancaba).
+// Alertas de contenedores: pendientes y listado general.
 const { getAlertasPendientes, getAlertas } = require('../controllers/alertasController');
 
 router.get('/pendientes', getAlertasPendientes);

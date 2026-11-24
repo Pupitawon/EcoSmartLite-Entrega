@@ -179,7 +179,7 @@ test('GET /api/config expone umbral y horas de sin reporte', async () => {
 });
 
 // ---------------- Ruta antigua PUT /api/contenedores/:id/nivel ----------------
-test('PUT antiguo: exige credencial, valida y usa la misma regla sin duplicados', async () => {
+test('PUT /nivel: exige credencial, valida y usa la misma regla sin duplicados', async () => {
   await limpiar(101);
   assert.equal((await put(101, { porcentaje_llenado: 90 }, null)).status, 401);
   assert.equal((await put('abc', { porcentaje_llenado: 90 })).status, 422);

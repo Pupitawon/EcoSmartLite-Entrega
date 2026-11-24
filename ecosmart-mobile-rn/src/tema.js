@@ -1,4 +1,4 @@
-// Colores y constantes tomados de la app de Jeremy (Tailwind: zinc / stone / emerald / amber).
+// Colores y constantes del tema (paleta zinc / stone / emerald / amber).
 export const FILL_THRESHOLDS = { MEDIUM: 50, FULL: 80 }; // RNF-04: verde 0-49, amarillo 50-79, rojo 80-100
 
 export const STATUS_META = {

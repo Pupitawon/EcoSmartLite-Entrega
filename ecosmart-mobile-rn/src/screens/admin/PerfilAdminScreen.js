@@ -35,7 +35,9 @@ export default function PerfilAdminScreen({ perfil, darkMode, onVolver, onConfig
       {/* Datos del administrador; la etiqueta de la organización va donde el ciudadano tiene sus EcoPuntos */}
       <View style={[e.tarjeta, { backgroundColor: t.superficie, borderColor: t.borde }]}>
         <View style={[e.avatar, { backgroundColor: darkMode ? '#27272a' : '#d1fae5', borderColor: t.acento }]}>
-          <Text style={{ color: darkMode ? '#34d399' : '#047857', fontWeight: '800', fontSize: 22 }}>A</Text>
+          <Text style={{ color: darkMode ? '#34d399' : '#047857', fontWeight: '800', fontSize: 22 }}>
+            {perfil?.nombre_completo?.charAt(0).toUpperCase() || 'A'}
+          </Text>
         </View>
         <Text style={{ color: t.texto, fontSize: 18, fontWeight: '700', marginTop: 10 }}>{perfil?.nombre_completo || 'Administrador'}</Text>
         <Text style={{ color: t.textoSuave, fontSize: 13 }}>{perfil?.correo}</Text>

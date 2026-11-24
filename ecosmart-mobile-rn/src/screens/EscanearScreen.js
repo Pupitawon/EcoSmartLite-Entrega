@@ -123,19 +123,33 @@ export default function EscanearScreen({ darkMode, saldo, onDeposito }) {
           </View>
         )}
 
-        <View style={[StyleSheet.absoluteFill, e.centro]} pointerEvents="none">
-          <View style={e.marco} />
-        </View>
+        {/* Fondo oscuro con un hueco al centro: el texto va arriba del cuadro y el aviso de error también */}
+        {permiso?.granted ? (
+          <View style={StyleSheet.absoluteFill} pointerEvents="none">
+            <View style={[e.sombra, e.sombraArriba]}>
+              <Text style={[e.indicacion, aviso ? { color: '#fca5a5' } : null]}>
+                {aviso || 'Apunta al QR del contenedor'}
+              </Text>
+            </View>
+            <View style={e.filaMarco}>
+              <View style={e.sombra} />
+              <View style={e.marco}>
+                <View style={[e.esquina, e.esqSupIzq]} />
+                <View style={[e.esquina, e.esqSupDer]} />
+                <View style={[e.esquina, e.esqInfIzq]} />
+                <View style={[e.esquina, e.esqInfDer]} />
+              </View>
+              <View style={e.sombra} />
+            </View>
+            <View style={[e.sombra, e.sombraAbajo]}>
+              <Text style={e.subindicacion}>Mantén el código dentro del cuadro</Text>
+            </View>
+          </View>
+        ) : null}
 
         <Pressable onPress={reiniciar} accessibilityLabel="Cancelar" style={e.cerrarCamara}>
           <X size={20} color="#fff" />
         </Pressable>
-
-        <View style={e.pieCamara} pointerEvents="none">
-          <Text style={{ color: aviso ? '#fca5a5' : '#fff', fontSize: 13, fontWeight: '600', textAlign: 'center' }}>
-            {aviso || 'Apunta al QR del contenedor'}
-          </Text>
-        </View>
       </View>
     );
   }
@@ -302,29 +316,45 @@ export default function EscanearScreen({ darkMode, saldo, onDeposito }) {
   return (
     <ScrollView contentContainerStyle={{ padding: 24 }} keyboardShouldPersistTaps="handled" style={{ backgroundColor: t.fondoApp }}>
       <View style={{ alignItems: 'center', marginBottom: 20 }}>
-        <Recycle size={56} color="#10b981" />
-        <Text style={{ fontSize: 18, fontWeight: '800', color: t.texto, marginTop: 8 }}>Registrar reciclaje</Text>
-        <Text style={{ fontSize: 12, color: t.textoSuave, textAlign: 'center', marginTop: 4 }}>
+        <View style={[e.circuloQr, { backgroundColor: darkMode ? '#052e22' : '#d1fae5' }]}>
+          <QrCode size={44} color="#10b981" />
+        </View>
+        <Text style={{ fontSize: 20, fontWeight: '800', color: t.texto, marginTop: 12 }}>Registrar reciclaje</Text>
+        <Text style={{ fontSize: 13, color: t.textoSuave, textAlign: 'center', marginTop: 4 }}>
           Escanea el QR del contenedor donde vas a depositar tus botellas.
         </Text>
       </View>
 
-      {typeof saldo === 'number' && (
-        <View style={[e.filaEntre, e.panel, { backgroundColor: t.superficie, borderColor: t.borde, marginTop: 0 }]}>
-          <Text style={{ fontSize: 13, color: t.textoCampo }}>Tu saldo</Text>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: '#10b981' }}>{saldo} ecopoints</Text>
+      <Pressable onPress={() => setFase('camara')} style={e.botonGrande}>
+        <QrCode size={20} color="#fff" />
+        <Text style={[e.botonTxt, { marginLeft: 10, fontSize: 16 }]}>Escanear QR</Text>
+      </Pressable>
+
+      {(typeof saldo === 'number' || resumen) && (
+        <View style={e.fila2}>
+          {typeof saldo === 'number' && (
+            <View style={[e.tile, { backgroundColor: t.superficie, borderColor: t.borde }]}>
+              <Text style={{ fontSize: 11, color: t.textoSuave }}>Tu saldo</Text>
+              <Text style={{ fontSize: 24, fontWeight: '800', color: '#10b981', marginTop: 2 }}>{saldo}</Text>
+              <Text style={{ fontSize: 11, color: t.textoSuave }}>ecopoints</Text>
+            </View>
+          )}
+          {resumen && (
+            <View style={[e.tile, { backgroundColor: t.superficie, borderColor: t.borde }]}>
+              <Text style={{ fontSize: 11, color: t.textoSuave }}>Con puntos hoy</Text>
+              <Text style={{ fontSize: 24, fontWeight: '800', color: t.texto, marginTop: 2 }}>
+                {usadas}
+                <Text style={{ fontSize: 14, fontWeight: '600', color: t.textoSuave }}> / {limite}</Text>
+              </Text>
+              <Text style={{ fontSize: 11, color: t.textoSuave }}>botellas</Text>
+            </View>
+          )}
         </View>
       )}
 
       {resumen && (
-        <View style={[e.panel, { backgroundColor: t.superficie, borderColor: t.borde }]}>
-          <View style={e.filaEntre}>
-            <Text style={{ fontSize: 13, color: t.textoCampo }}>Botellas con puntos hoy</Text>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: t.texto }}>
-              {usadas} / {limite}
-            </Text>
-          </View>
-          <View style={[e.barra, { backgroundColor: darkMode ? '#27272a' : '#e7e5e4' }]}>
+        <View style={[e.panel, { backgroundColor: t.superficie, borderColor: t.borde, padding: 16 }]}>
+          <View style={[e.barra, { backgroundColor: darkMode ? '#27272a' : '#e7e5e4', marginTop: 0 }]}>
             <View
               style={{
                 width: `${limite > 0 ? Math.min(100, (usadas / limite) * 100) : 0}%`,
@@ -334,7 +364,7 @@ export default function EscanearScreen({ darkMode, saldo, onDeposito }) {
               }}
             />
           </View>
-          <Text style={{ fontSize: 11, color: t.textoSuave, marginTop: 6 }}>
+          <Text style={{ fontSize: 12, color: t.textoSuave, marginTop: 8 }}>
             {resumen.restantes_hoy > 0
               ? `Te quedan ${botellas(resumen.restantes_hoy)} con puntos · ${resumen.ecopoints_por_botella} ecopoints cada una`
               : 'Alcanzaste el límite de hoy. Mañana podrás volver a sumar puntos.'}
@@ -342,12 +372,7 @@ export default function EscanearScreen({ darkMode, saldo, onDeposito }) {
         </View>
       )}
 
-      <Pressable onPress={() => setFase('camara')} style={[e.boton, { backgroundColor: '#059669', flexDirection: 'row', justifyContent: 'center', marginTop: 16 }]}>
-        <QrCode size={18} color="#fff" />
-        <Text style={[e.botonTxt, { marginLeft: 8 }]}>Escanear QR</Text>
-      </Pressable>
-
-      <Pressable onPress={() => setManual((m) => !m)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 16 }}>
+      <Pressable onPress={() => setManual((m) => !m)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 20, padding: 6 }}>
         <Keyboard size={14} color={t.textoSuave} />
         <Text style={{ fontSize: 12, color: t.textoSuave, marginLeft: 6 }}>Ingresar código manualmente</Text>
       </Pressable>
@@ -380,9 +405,23 @@ export default function EscanearScreen({ darkMode, saldo, onDeposito }) {
 
 const e = StyleSheet.create({
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  marco: { width: 240, height: 240, borderRadius: 24, borderWidth: 3, borderColor: '#10b981' },
+  sombra: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
+  sombraArriba: { justifyContent: 'flex-end', alignItems: 'center', paddingHorizontal: 24, paddingBottom: 20 },
+  sombraAbajo: { alignItems: 'center', paddingHorizontal: 24, paddingTop: 20 },
+  filaMarco: { flexDirection: 'row', height: 250 },
+  marco: { width: 250, height: 250 },
+  esquina: { position: 'absolute', width: 40, height: 40, borderColor: '#10b981' },
+  esqSupIzq: { top: 0, left: 0, borderTopWidth: 4, borderLeftWidth: 4, borderTopLeftRadius: 20 },
+  esqSupDer: { top: 0, right: 0, borderTopWidth: 4, borderRightWidth: 4, borderTopRightRadius: 20 },
+  esqInfIzq: { bottom: 0, left: 0, borderBottomWidth: 4, borderLeftWidth: 4, borderBottomLeftRadius: 20 },
+  esqInfDer: { bottom: 0, right: 0, borderBottomWidth: 4, borderRightWidth: 4, borderBottomRightRadius: 20 },
+  indicacion: { color: '#fff', fontSize: 16, fontWeight: '700', textAlign: 'center' },
+  subindicacion: { color: '#d4d4d8', fontSize: 13, textAlign: 'center' },
+  circuloQr: { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center' },
+  botonGrande: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#059669', borderRadius: 16, paddingVertical: 16, marginBottom: 4 },
+  fila2: { flexDirection: 'row', gap: 12, marginTop: 16 },
+  tile: { flex: 1, borderWidth: 1, borderRadius: 16, padding: 14, alignItems: 'center' },
   cerrarCamara: { position: 'absolute', top: 16, right: 16, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 999, padding: 8 },
-  pieCamara: { position: 'absolute', left: 16, right: 16, bottom: 32, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 12, padding: 12 },
   panel: { borderWidth: 1, borderRadius: 16, padding: 20, marginTop: 12, alignSelf: 'stretch' },
   filaEntre: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   barra: { height: 8, borderRadius: 999, overflow: 'hidden', marginTop: 8 },

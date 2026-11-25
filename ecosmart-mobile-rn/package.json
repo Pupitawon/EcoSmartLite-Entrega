@@ -29,7 +29,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "node --experimental-default-type=module --test \"test/*.test.mjs\""
+    "test": "node --experimental-detect-module --test \"test/*.test.mjs\""
   },
   "private": true
 }
